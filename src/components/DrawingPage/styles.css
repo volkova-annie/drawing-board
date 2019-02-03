@@ -9,6 +9,10 @@
   cursor: pointer;
 }
 
+.panel button.disabled {
+  cursor: not-allowed;
+}
+
 .wrapper {
   display: flex;
   flex-direction: column;

@@ -4,42 +4,80 @@ import styles from './styles.css';
 import reign_image from '../../images/rhein.jpg'
 
 const veterxShaderSource = `
-// атрибут, который будет получать данные из буфера
-attribute vec4 a_position;
-attribute vec2 a_texCoord;
-
-varying highp vec2 v_texCoord;
-
-// все шейдеры имеют функцию main
-void main() {
+  // атрибут, который будет получать данные из буфера
+  attribute vec4 a_position;
+  attribute vec2 a_texCoord;
+  
+  varying highp vec2 v_texCoord;
+  
+  uniform bool u_flipY;
+  
+  // все шейдеры имеют функцию main
+  void main() {
 
   // gl_Position - специальная переменная вершинного шейдера,
   // которая отвечает за установку положения
   gl_Position = a_position;
-  v_texCoord = a_texCoord;
+  v_texCoord = vec2(a_texCoord.x, u_flipY ? 1.0 - a_texCoord.y : a_texCoord.y);
 }`;
 
-const fragmentShaderSource = `
-// фрагментные шейдеры не имеют точности по умолчанию, поэтому нам необходимо её
+const blurFragmentShaderSource = `
+  // фрагментные шейдеры не имеют точности по умолчанию, поэтому нам необходимо её
   // указать. mediump подойдёт для большинства случаев. Он означает "средняя точность"
+
   precision mediump float;
  
   varying highp vec2 v_texCoord;
 
   uniform sampler2D u_sampler;
-  uniform float u_blurSize;
+  uniform float     u_sigma;  // Gaussian sigma
+  uniform vec2      u_dir;    // horiz=(1.0, 0.0), vert=(0.0, 1.0)
+
+  #define PI 3.141593
+  #define MAX_STEPS 30
 
   void main() {
-    vec2 step = vec2(0.5 / 512.0) * u_blurSize;
-    // gl_FragColor - специальная переменная фрагментного шейдера.
-    // Она отвечает за установку цвета.
-    //gl_FragColor = vec4(1, 0, 0.5, 1); // вернёт красновато-фиолетовый
-    vec4 color = vec4(0.0);
-    color += texture2D(u_sampler, v_texCoord + step * vec2(-1, -1));
-    color += texture2D(u_sampler, v_texCoord + step * vec2(-1,  1));
-    color += texture2D(u_sampler, v_texCoord + step * vec2( 1,  1));
-    color += texture2D(u_sampler, v_texCoord + step * vec2( 1, -1));
-    gl_FragColor = color * 0.25;
+    vec2 loc = v_texCoord; // center pixel cooordinate
+    vec4 acc; // accumulator
+    acc = texture2D(u_sampler, loc); // accumulate center pixel
+    if (u_sigma > 0.0) {
+      for (int i = 1; i <= MAX_STEPS; i++) {
+        float coeff = exp(-0.5 * float(i) * float(i) / (u_sigma * u_sigma));
+        acc += (texture2D(u_sampler, loc - float(i) * u_dir)) * coeff; // L
+        acc += (texture2D(u_sampler, loc + float(i) * u_dir)) * coeff; // R
+      }
+      acc *= 1.0 / (sqrt(2.0 * PI) * u_sigma); // normalize for unity gain
+    }
+
+    gl_FragColor = acc;
+  }`;
+
+const bwFragmentShaderSource = `
+  precision mediump float;
+ 
+  varying highp vec2 v_texCoord;
+
+  uniform sampler2D u_sampler;
+  uniform float     u_sigma;  // Gaussian sigma
+  uniform vec2      u_dir;    // horiz=(1.0, 0.0), vert=(0.0, 1.0)
+
+  #define PI 3.141593
+  #define MAX_STEPS 30
+
+  void main() {
+    vec2 loc = v_texCoord; // center pixel cooordinate
+    vec4 acc; // accumulator
+    acc = texture2D(u_sampler, loc); // accumulate center pixel
+    if (u_sigma > 0.0) {
+      for (int i = 1; i <= MAX_STEPS; i++) {
+        float coeff = exp(-0.5 * float(i) * float(i) / (u_sigma * u_sigma));
+        acc += (texture2D(u_sampler, loc - float(i) * u_dir)) * coeff; // L
+        acc += (texture2D(u_sampler, loc + float(i) * u_dir)) * coeff; // R
+      }
+      acc *= 1.0 / (sqrt(2.0 * PI) * u_sigma); // normalize for unity gain
+    }
+
+    gl_FragColor = acc;
   }`;
 
 // три двумерных точки
@@ -55,8 +93,8 @@ class DrawingPage extends Component {
   constructor(props) {
     super(props);
     // this.fill = this.fill.bind(this);
-    this.onClick = this.onClick.bind(this);
     this.renderGL = this.renderGL.bind(this);
+    this.createRenderTarget = this.createRenderTarget.bind(this);
 
     this.canvas = React.createRef();
 
@@ -68,6 +106,10 @@ class DrawingPage extends Component {
       positionAttributeLocation: -1,
       texCoordAttributeLocation: -1,
       positionBuffer: null,
+      sceneTexture: null,
+      frameBuffer: null,
+      blurSize: 0,
+      isImageLoaded: false
     };
   }
 
@@ -81,10 +123,10 @@ class DrawingPage extends Component {
       return;
     }
 
-    this.setState({ gl: gl, blurSize: '0.0' });
+    this.setState({ gl: gl });
 
     const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, veterxShaderSource);
-    const fragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+    const fragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, blurFragmentShaderSource);
 
     // console.log(gl.canvas.width, gl.canvas.height);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -105,19 +147,21 @@ class DrawingPage extends Component {
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadVertices), gl.STATIC_DRAW);
       // load image
       const image = new Image();
-      //image.crossOrigin = "anonymous";
       image.onload = () => {
         gl.bindTexture(gl.TEXTURE_2D, this.state.lennaImage);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
-         gl.generateMipmap(gl.TEXTURE_2D);
+        gl.generateMipmap(gl.TEXTURE_2D);
         gl.bindTexture(gl.TEXTURE_2D, null);
+
+        this.setState({ isImageLoaded: true });
       };
       image.src = reign_image;
-      //image.src = 'https://www.cosy.sbg.ac.at/~pmeerw/Watermarking/lena_color.gif';
+      // Создание промежуточного буффера отображения
+      this.createRenderTarget();
     });
 
     // console.log("a_position", this.positionAttributeLocation);
@@ -140,8 +184,13 @@ class DrawingPage extends Component {
 
   blurImage(image, blurSize) {
     const {
-      gl, blurShaderProgram, positionAttributeLocation, positionBuffer, texCoordAttributeLocation
+      gl, blurShaderProgram, positionAttributeLocation, positionBuffer, texCoordAttributeLocation,
+      canvasHeight, canvasWidth, frameBuffer, sceneTexture, isImageLoaded
     } = this.state;
+
+    if (!isImageLoaded) {
+      return;
+    }
 
     if (!blurShaderProgram) {
       console.log('blurShaderProgram');
@@ -183,13 +232,45 @@ class DrawingPage extends Component {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, image);
     gl.uniform1i(gl.getUniformLocation(blurShaderProgram, "u_sampler"), 0);
-    gl.uniform1f(gl.getUniformLocation(blurShaderProgram, "u_blurSize"), blurSize);
+    gl.uniform1f(gl.getUniformLocation(blurShaderProgram, "u_sigma"), blurSize);
+    gl.uniform2fv(gl.getUniformLocation(blurShaderProgram, "u_dir"), [1.0 / canvasWidth, 0.0]);
+    gl.uniform1i(gl.getUniformLocation(blurShaderProgram, "u_flipY"), 0);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
 
     // Для отправки на отрисовку
     const primitiveType = gl.TRIANGLE_STRIP;
     offset = 0;
     const count = 4; // количество вершин
     gl.drawArrays(primitiveType, offset, count);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
+
+    gl.uniform2fv(gl.getUniformLocation(blurShaderProgram, "u_dir"), [0.0, 1.0 / canvasHeight]);
+    gl.uniform1i(gl.getUniformLocation(blurShaderProgram, "u_flipY"), 1);
+
+    gl.drawArrays(primitiveType, offset, count);
+  }
+
+  createRenderTarget() {
+    const { gl, canvasWidth, canvasHeight } = this.state;
+    const sceneTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvasWidth, canvasHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const frameBuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+    const attachmentPoint = gl.COLOR_ATTACHMENT0;
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, sceneTexture, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    this.setState({ sceneTexture, frameBuffer});
   }
 
   createShader(gl, type, source) {
@@ -221,8 +302,8 @@ class DrawingPage extends Component {
     gl.deleteProgram(program);
   }
 
-  onClick() {
-    const blurSize = (this.state.blurSize + 1) % 10;
+  setBlurRadius(value) {
+    const blurSize = Math.min(value, 10);
 
     this.setState({ blurSize });
   }
@@ -234,8 +315,7 @@ class DrawingPage extends Component {
         <canvas
           ref={ this.canvas }
           width={ canvasWidth }
-          height={ canvasHeight }
-          onClick={ this.onClick } />
+          height={ canvasHeight }/>
       </div>
     )
   }

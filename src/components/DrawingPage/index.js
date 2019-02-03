@@ -8,11 +8,29 @@ class DrawingPage extends Component {
     super(props);
 
     this.getColor = this.getColor.bind(this);
+    this.handleClick = this.handleClick.bind(this);
+    this.handleChange = this.handleChange.bind(this);
+    this.state = {
+      blurRadius: 0
+    }
   };
 
   getColor() {
-    const color = document.getElementById('color').value;
-    return color;
+    return document.getElementById('color').value;
+  }
+
+  handleClick() {
+    this.updateSliderValue(0);
+  }
+
+  handleChange(event) {
+    const value = event.target.value;
+    this.updateSliderValue(value);
+  }
+
+  updateSliderValue(value) {
+    this.board.setBlurRadius(value);
+    this.setState({ blurRadius: value});
   }
 
   render() {
@@ -23,8 +41,20 @@ class DrawingPage extends Component {
             Choose color:
           </label>
           <input id="color" type="color" />
-          <button onClick={() => this.board.fill(this.getColor())}>Fill</button>
-          <button onClick={() => this.board.clear()} className={styles.clear}>Clear</button>
+          <input
+            type="range"
+            min="0"
+            max="10"
+            value={ this.state.blurRadius }
+            onChange={ this.handleChange }
+          />
+          <button disabled={true} onClick={() => this.board.fill(this.getColor())} className={styles.disabled}>Fill</button>
+          <button disabled={true} onClick={() => this.board.clear()} className={styles.disabled}>Clear</button>
+          <button
+            onClick={ this.handleClick }
+            className={styles.clear}>
+            Reset Blur
+          </button>
         </div>
         <DrawingBoard width="700px" height="500px" ref={instance => {this.board = instance}} />
       </div>
