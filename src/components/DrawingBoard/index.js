@@ -58,26 +58,27 @@ const bwFragmentShaderSource = `
   varying highp vec2 v_texCoord;
 
   uniform sampler2D u_sampler;
-  uniform float     u_sigma;  // Gaussian sigma
-  uniform vec2      u_dir;    // horiz=(1.0, 0.0), vert=(0.0, 1.0)
-
-  #define PI 3.141593
-  #define MAX_STEPS 30
 
   void main() {
     vec2 loc = v_texCoord; // center pixel cooordinate
-    vec4 acc; // accumulator
-    acc = texture2D(u_sampler, loc); // accumulate center pixel
-    if (u_sigma > 0.0) {
-      for (int i = 1; i <= MAX_STEPS; i++) {
-        float coeff = exp(-0.5 * float(i) * float(i) / (u_sigma * u_sigma));
-        acc += (texture2D(u_sampler, loc - float(i) * u_dir)) * coeff; // L
-        acc += (texture2D(u_sampler, loc + float(i) * u_dir)) * coeff; // R
-      }
-      acc *= 1.0 / (sqrt(2.0 * PI) * u_sigma); // normalize for unity gain
-    }
+    vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
+    float bw = (acc.r + acc.g + acc.b) / 3.0; // берем сумму всех каналов и нормализуем его, чтобы значение было от 0 до 1
+    
+    gl_FragColor = vec4(vec3(bw), 1.0);
+  }`;
 
-    gl_FragColor = acc;
+const defaultFragmentShaderSource = `
+  precision mediump float;
+ 
+  varying highp vec2 v_texCoord;
+
+  uniform sampler2D u_sampler;
+
+  void main() {
+    vec2 loc = v_texCoord; // center pixel cooordinate
+    vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
+    
+    gl_FragColor = vec4(acc, 1.0);
   }`;
 
 // три двумерных точки
@@ -103,13 +104,16 @@ class DrawingPage extends Component {
       canvasHeight: 512,
       gl: null,
       blurShaderProgram: null,
+      bwShaderProgram: null,
+      defaultShaderProgram: null,
       positionAttributeLocation: -1,
       texCoordAttributeLocation: -1,
       positionBuffer: null,
       sceneTexture: null,
       frameBuffer: null,
       blurSize: 0,
-      isImageLoaded: false
+      isImageLoaded: false,
+      isBlackAndWhite: false
     };
   }
 
@@ -126,13 +130,17 @@ class DrawingPage extends Component {
     this.setState({ gl: gl });
 
     const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, veterxShaderSource);
-    const fragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, blurFragmentShaderSource);
+    const blurFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, blurFragmentShaderSource);
+    const bwFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, bwFragmentShaderSource);
+    const defaultFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, defaultFragmentShaderSource);
 
     // console.log(gl.canvas.width, gl.canvas.height);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
     this.setState({
-      blurShaderProgram: this.createProgram(gl, vertexShader, fragmentShader),
+      blurShaderProgram: this.createProgram(gl, vertexShader, blurFragmentShader),
+      bwShaderProgram: this.createProgram(gl, vertexShader, bwFragmentShader),
+      defaultShaderProgram: this.createProgram(gl, vertexShader, defaultFragmentShader),
       positionBuffer: gl.createBuffer(),
       lennaImage: gl.createTexture()
     }, () => {
@@ -173,13 +181,134 @@ class DrawingPage extends Component {
 
   renderGL() {
     //console.log('asd');
-    const { gl, lennaImage, blurSize } = this.state;
+    const { gl, lennaImage, blurSize, isBlackAndWhite } = this.state;
 
     // очищаем canvas
     gl.clearColor(0, 1, 1, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    this.blurImage(lennaImage, blurSize);
+    //this.blurImage(lennaImage, blurSize);
+    if (isBlackAndWhite) {
+      this.bwImage(lennaImage);
+    } else {
+      this.defaultImage(lennaImage);
+    }
+  }
+
+  defaultImage(image){
+    const {
+      gl, defaultShaderProgram, positionAttributeLocation, positionBuffer, texCoordAttributeLocation, isImageLoaded
+    } = this.state;
+
+    if (!isImageLoaded) {
+      return;
+    }
+
+    if (!defaultShaderProgram) {
+      console.log('defaultShaderProgram');
+      return;
+    }
+    if (positionAttributeLocation === -1) {
+      console.log('positionAttributeLocation');
+      return;
+    }
+    if (texCoordAttributeLocation === -1) {
+      console.log('texCoordAttributeLocation');
+      return;
+    }
+
+    gl.useProgram(defaultShaderProgram);
+
+    gl.enableVertexAttribArray(positionAttributeLocation);
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+    // Для вершинного shader'a
+    // Указываем атрибуту positionAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
+    const size = 2;           // 2 компоненты на итерацию (x, y)
+    const type = gl.FLOAT;    // наши данные - 32-битные числа с плавающей точкой
+    const normalize = false;  // не нормализовать данные (не приводить в диапазон от 0 до 1)
+    const stride = 4 * 4;     // на каждую вершину храним 4 компоненты, размер gl.FLOAT - 4 байта
+    let offset = 0;           // начинать с начала буфера
+
+    // Для атрибута позиции необходимо использовать следуюшие данные
+    gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
+    // Для атрибута текстурных координат необходимо использовать следуюшие данные
+    gl.enableVertexAttribArray(texCoordAttributeLocation);
+    // Для атрибута текстурных координат texCoordAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
+    // пропускаем первые 2 элемента, размер gl.FLOAT - 4 байта
+    offset = 2 * 4;
+    gl.vertexAttribPointer(texCoordAttributeLocation, size, type, normalize, stride, offset);
+
+    // Для фрагментного shader'a
+    // bind texture samples
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, image);
+    gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, "u_sampler"), 0);
+    gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, "u_flipY"), 0);
+
+    // Для отправки на отрисовку
+    const primitiveType = gl.TRIANGLE_STRIP;
+    offset = 0;
+    const count = 4; // количество вершин
+    gl.drawArrays(primitiveType, offset, count);
+  }
+
+  bwImage(image){
+    const {
+      gl, bwShaderProgram, positionAttributeLocation, positionBuffer, texCoordAttributeLocation, isImageLoaded
+    } = this.state;
+
+    if (!isImageLoaded) {
+      return;
+    }
+
+    if (!bwShaderProgram) {
+      console.log('bwShaderProgram');
+      return;
+    }
+    if (positionAttributeLocation === -1) {
+      console.log('positionAttributeLocation');
+      return;
+    }
+    if (texCoordAttributeLocation === -1) {
+      console.log('texCoordAttributeLocation');
+      return;
+    }
+
+    gl.useProgram(bwShaderProgram);
+
+    gl.enableVertexAttribArray(positionAttributeLocation);
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+    // Для вершинного shader'a
+    // Указываем атрибуту positionAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
+    const size = 2;           // 2 компоненты на итерацию (x, y)
+    const type = gl.FLOAT;    // наши данные - 32-битные числа с плавающей точкой
+    const normalize = false;  // не нормализовать данные (не приводить в диапазон от 0 до 1)
+    const stride = 4 * 4;     // на каждую вершину храним 4 компоненты, размер gl.FLOAT - 4 байта
+    let offset = 0;           // начинать с начала буфера
+
+    // Для атрибута позиции необходимо использовать следуюшие данные
+    gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
+    // Для атрибута текстурных координат необходимо использовать следуюшие данные
+    gl.enableVertexAttribArray(texCoordAttributeLocation);
+    // Для атрибута текстурных координат texCoordAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
+    // пропускаем первые 2 элемента, размер gl.FLOAT - 4 байта
+    offset = 2 * 4;
+    gl.vertexAttribPointer(texCoordAttributeLocation, size, type, normalize, stride, offset);
+
+    // Для фрагментного shader'a
+    // bind texture samples
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, image);
+    gl.uniform1i(gl.getUniformLocation(bwShaderProgram, "u_sampler"), 0);
+    gl.uniform1i(gl.getUniformLocation(bwShaderProgram, "u_flipY"), 0);
+
+    // Для отправки на отрисовку
+    const primitiveType = gl.TRIANGLE_STRIP;
+    offset = 0;
+    const count = 4; // количество вершин
+    gl.drawArrays(primitiveType, offset, count);
   }
 
   blurImage(image, blurSize) {
@@ -300,6 +429,14 @@ class DrawingPage extends Component {
 
     console.log(gl.getProgramInfoLog(program));
     gl.deleteProgram(program);
+  }
+
+  makeBlackWhite() {
+    this.setState({ isBlackAndWhite: true });
+  }
+
+  resetBlackAndWhite() {
+    this.setState({ isBlackAndWhite: false });
   }
 
   setBlurRadius(value) {
