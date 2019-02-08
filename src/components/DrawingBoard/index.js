@@ -109,8 +109,10 @@ class DrawingPage extends Component {
       positionAttributeLocation: -1,
       texCoordAttributeLocation: -1,
       positionBuffer: null,
-      sceneTexture: null,
-      frameBuffer: null,
+      renderBuffer1: null,
+      renderBuffer2: null,
+      renderTexture1: null,
+      renderTexture2: null,
       blurSize: 0,
       isImageLoaded: false,
       isBlackAndWhite: false
@@ -142,11 +144,18 @@ class DrawingPage extends Component {
       bwShaderProgram: this.createProgram(gl, vertexShader, bwFragmentShader),
       defaultShaderProgram: this.createProgram(gl, vertexShader, defaultFragmentShader),
       positionBuffer: gl.createBuffer(),
-      lennaImage: gl.createTexture()
+      lennaImage: gl.createTexture(),
     }, () => {
+      const { frameBuffer: frameBuffer1, renderTexture: renderTexture1 } = this.createRenderTarget();
+      const { frameBuffer: frameBuffer2, renderTexture: renderTexture2 } = this.createRenderTarget();
       this.setState({
         positionAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_position"),
-        texCoordAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_texCoord")
+        texCoordAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_texCoord"),
+        // Создание промежуточного буффера отображения (картинка, в которую рисуем)
+        renderBuffer1: frameBuffer1,
+        renderTexture1: renderTexture1,
+        renderBuffer2: frameBuffer2,
+        renderTexture2: renderTexture2
       });
       // В переменной ARRAY_BUFFER находится this.state.positionBuffer
       gl.bindBuffer(gl.ARRAY_BUFFER, this.state.positionBuffer);
@@ -168,8 +177,6 @@ class DrawingPage extends Component {
         this.setState({ isImageLoaded: true });
       };
       image.src = reign_image;
-      // Создание промежуточного буффера отображения
-      this.createRenderTarget();
     });
 
     // console.log("a_position", this.positionAttributeLocation);
@@ -180,22 +187,25 @@ class DrawingPage extends Component {
   }
 
   renderGL() {
-    //console.log('asd');
-    const { gl, lennaImage, blurSize, isBlackAndWhite } = this.state;
+    const {
+      gl, lennaImage, blurSize, isBlackAndWhite, renderBuffer1,
+      renderBuffer2, renderTexture1, renderTexture2
+    } = this.state;
 
     // очищаем canvas
     gl.clearColor(0, 1, 1, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     //this.blurImage(lennaImage, blurSize);
+    this.copyToRenderTarget(lennaImage, renderBuffer1);
     if (isBlackAndWhite) {
-      this.bwImage(lennaImage);
-    } else {
-      this.defaultImage(lennaImage);
+      this.bwImage(lennaImage, renderBuffer1);
     }
+    this.blurImage(renderTexture1, blurSize, renderBuffer2, renderTexture2, renderBuffer1);
+    this.copyToRenderTarget(renderTexture1, null);
   }
 
-  defaultImage(image){
+  copyToRenderTarget(image, renderTarget = null, flipY = false) {
     const {
       gl, defaultShaderProgram, positionAttributeLocation, positionBuffer, texCoordAttributeLocation, isImageLoaded
     } = this.state;
@@ -215,6 +225,10 @@ class DrawingPage extends Component {
     if (texCoordAttributeLocation === -1) {
       console.log('texCoordAttributeLocation');
       return;
+    }
+
+    if (renderTarget) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget);
     }
 
     gl.useProgram(defaultShaderProgram);
@@ -242,18 +256,23 @@ class DrawingPage extends Component {
     // Для фрагментного shader'a
     // bind texture samples
     gl.activeTexture(gl.TEXTURE0);
+    console.log(image);
     gl.bindTexture(gl.TEXTURE_2D, image);
     gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, "u_sampler"), 0);
-    gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, "u_flipY"), 0);
+    gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, "u_flipY"), flipY);
 
     // Для отправки на отрисовку
     const primitiveType = gl.TRIANGLE_STRIP;
     offset = 0;
     const count = 4; // количество вершин
     gl.drawArrays(primitiveType, offset, count);
+
+    if (renderTarget) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
   }
 
-  bwImage(image){
+  bwImage(image, renderTarget){
     const {
       gl, bwShaderProgram, positionAttributeLocation, positionBuffer, texCoordAttributeLocation, isImageLoaded
     } = this.state;
@@ -273,6 +292,10 @@ class DrawingPage extends Component {
     if (texCoordAttributeLocation === -1) {
       console.log('texCoordAttributeLocation');
       return;
+    }
+
+    if (renderTarget) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget);
     }
 
     gl.useProgram(bwShaderProgram);
@@ -309,12 +332,16 @@ class DrawingPage extends Component {
     offset = 0;
     const count = 4; // количество вершин
     gl.drawArrays(primitiveType, offset, count);
+
+    if (renderTarget) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
   }
 
-  blurImage(image, blurSize) {
+  blurImage(image, blurSize, tempRenderTarget, tempRenderTexture, renderTarget) {
     const {
       gl, blurShaderProgram, positionAttributeLocation, positionBuffer, texCoordAttributeLocation,
-      canvasHeight, canvasWidth, frameBuffer, sceneTexture, isImageLoaded
+      canvasHeight, canvasWidth, isImageLoaded
     } = this.state;
 
     if (!isImageLoaded) {
@@ -365,7 +392,7 @@ class DrawingPage extends Component {
     gl.uniform2fv(gl.getUniformLocation(blurShaderProgram, "u_dir"), [1.0 / canvasWidth, 0.0]);
     gl.uniform1i(gl.getUniformLocation(blurShaderProgram, "u_flipY"), 0);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, tempRenderTarget);
 
     // Для отправки на отрисовку
     const primitiveType = gl.TRIANGLE_STRIP;
@@ -373,19 +400,28 @@ class DrawingPage extends Component {
     const count = 4; // количество вершин
     gl.drawArrays(primitiveType, offset, count);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
+    if (renderTarget) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget);
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, tempRenderTexture);
 
     gl.uniform2fv(gl.getUniformLocation(blurShaderProgram, "u_dir"), [0.0, 1.0 / canvasHeight]);
     gl.uniform1i(gl.getUniformLocation(blurShaderProgram, "u_flipY"), 1);
 
     gl.drawArrays(primitiveType, offset, count);
+
+    if (renderTarget) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
   }
 
   createRenderTarget() {
     const { gl, canvasWidth, canvasHeight } = this.state;
-    const sceneTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
+    const renderTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, renderTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvasWidth, canvasHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -394,12 +430,13 @@ class DrawingPage extends Component {
     const frameBuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
     const attachmentPoint = gl.COLOR_ATTACHMENT0;
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, sceneTexture, 0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, renderTexture, 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     gl.bindTexture(gl.TEXTURE_2D, null);
 
-    this.setState({ sceneTexture, frameBuffer});
+    // this.setState({ renderBuffer1, frameBuffer});
+    return { renderTexture, frameBuffer };
   }
 
   createShader(gl, type, source) {
