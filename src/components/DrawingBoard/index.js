@@ -256,7 +256,6 @@ class DrawingPage extends Component {
     // Для фрагментного shader'a
     // bind texture samples
     gl.activeTexture(gl.TEXTURE0);
-    console.log(image);
     gl.bindTexture(gl.TEXTURE_2D, image);
     gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, "u_sampler"), 0);
     gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, "u_flipY"), flipY);
