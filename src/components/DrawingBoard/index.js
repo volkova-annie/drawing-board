@@ -21,7 +21,6 @@ const quadVertices = [
 class DrawingPage extends Component {
   constructor(props) {
     super(props);
-    // this.fill = this.fill.bind(this);
     this.renderGL = this.renderGL.bind(this);
     this.createRenderTarget = this.createRenderTarget.bind(this);
 
@@ -39,10 +38,9 @@ class DrawingPage extends Component {
       positionAttributeLocation: -1,
       texCoordAttributeLocation: -1,
       positionBuffer: null,
-      renderBuffer1: null,
-      renderBuffer2: null,
-      renderTexture1: null,
-      renderTexture2: null,
+
+      rtFullA: null,
+      rtFullB: null,
       blurSize: 0,
       isImageLoaded: false,
       isBlackAndWhite: false
@@ -59,119 +57,88 @@ class DrawingPage extends Component {
       return;
     }
 
-    this.setState({ gl: gl, render: new Render(gl) });
-
     const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const blurFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, blurFragmentShaderSource);
     const bwFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, bwFragmentShaderSource);
     const defaultFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, defaultFragmentShaderSource);
 
-    // console.log(gl.canvas.width, gl.canvas.height);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-    this.setState({
-      blurShaderProgram: this.createProgram(gl, vertexShader, blurFragmentShader),
-      bwShaderProgram: this.createProgram(gl, vertexShader, bwFragmentShader),
-      defaultShaderProgram: this.createProgram(gl, vertexShader, defaultFragmentShader),
-      positionBuffer: gl.createBuffer(),
-      lennaImage: gl.createTexture()
-    }, () => {
-      const { frameBuffer: frameBuffer1, renderTexture: renderTexture1 } = this.createRenderTarget();
-      const { frameBuffer: frameBuffer2, renderTexture: renderTexture2 } = this.createRenderTarget();
+    const render = new Render(gl);
+    const blurShaderProgram = this.createProgram(gl, vertexShader, blurFragmentShader);
+    const bwShaderProgram = this.createProgram(gl, vertexShader, bwFragmentShader);
+    const defaultShaderProgram = this.createProgram(gl, vertexShader, defaultFragmentShader);
+    const positionBuffer = gl.createBuffer();
 
-      this.createRenderBuffer(gl, frameBuffer1, renderTexture1, frameBuffer2, renderTexture2);
+    this.setState({
+      gl,
+      render,
+      blurShaderProgram,
+      bwShaderProgram,
+      defaultShaderProgram,
+      positionBuffer
+    }, () => {
+      this.setState({
+        positionAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_position"),
+        texCoordAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_texCoord"),
+        rtFullA: this.createRenderTarget(),
+        rtFullB: this.createRenderTarget()
+      });
 
       // В переменной ARRAY_BUFFER находится this.state.positionBuffer
       gl.bindBuffer(gl.ARRAY_BUFFER, this.state.positionBuffer);
       // В ARRAY_BUFFER передаем quadVertices и флаг, что структура не будет меняться
-      console.log();
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadVertices), gl.STATIC_DRAW);
-
-
-      //fetch(reign_image)
-      //  .then(function(response) {
-      //    return response.blob()
-      //  })
-      //  .then((blob) => {
-      //    const reader = new FileReader();
-      //    reader.onloadend = () => {
-      //      this.setState({ lennaImage: this.state.render.createTexture(reader.result).texture});
-      //
-      //      this.setState({ isImageLoaded: true });
-      //    };
-      //
-      //    reader.readAsArrayBuffer(blob);
-      //  });
 
       // load image
       const image = new Image();
       image.onload = () => {
-        //console.log("asd");
-        console.log(image);
-        this.setState({ lennaImage: this.state.render.createTexture(image).texture });
-      //  console.log(image);
-      //
-      //  gl.bindTexture(gl.TEXTURE_2D, this.state.lennaImage);
-      //  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-      //  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      //  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      //  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      //  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
-      //  gl.generateMipmap(gl.TEXTURE_2D);
-      //  gl.bindTexture(gl.TEXTURE_2D, null);
+        this.setState({ lennaImage: this.state.render.createTexture(image) });
 
         this.setState({ isImageLoaded: true });
       };
       image.src = reign_image;
     });
 
-    // console.log("a_position", this.positionAttributeLocation);
-    // console.log("a_texCoord", this.texCoordAttributeLocation);
-
     // Вызов renderGL 100 кадров в секунду
     setInterval(this.renderGL, 100);
   }
 
-  createRenderBuffer(gl, frameBuffer1, renderTexture1, frameBuffer2, renderTexture2) {
-    this.setState({
-      positionAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_position"),
-      texCoordAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_texCoord"),
-      // Создание промежуточного буффера отображения (картинка, в которую рисуем)
-      renderBuffer1: frameBuffer1,
-      renderTexture1: renderTexture1,
-      renderBuffer2: frameBuffer2,
-      renderTexture2: renderTexture2
-    });
-  }
-
   renderGL() {
     const {
-      gl, lennaImage, blurSize, isBlackAndWhite, renderBuffer1,
-      renderBuffer2, renderTexture1, renderTexture2
+      gl, lennaImage, blurSize, isBlackAndWhite, render
     } = this.state;
 
     // очищаем canvas
     gl.clearColor(0, 1, 1, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    //this.blurImage(lennaImage, blurSize);
-    //this.copyToRenderTarget(lennaImage, null);
-
-    //this.copyToRenderTarget(lennaImage);
-    this.copyToRenderTarget(lennaImage, renderBuffer1);
-    if (isBlackAndWhite) {
-      this.bwImage(lennaImage, renderBuffer1);
+    if (!this.state.isImageLoaded) {
+      return;
     }
-    this.blurImage(renderTexture1, blurSize, renderBuffer2, renderTexture2, renderBuffer1);
-    this.copyToRenderTarget(renderTexture1, null);
+
+    render.pushRenderTarget(this.state.rtFullB);
+    this.copyTexture(lennaImage, false);
+    render.popRenderTarget();
+
+    render.pushRenderTarget(this.state.rtFullA);
+    if (isBlackAndWhite) {
+      this.bwImage(this.state.rtFullB);
+    } else {
+      this.copyTexture(this.state.rtFullB);
+    }
+    render.popRenderTarget();
+
+    this.blurImage(this.state.rtFullA, blurSize, this.state.rtFullB);
   }
 
-  copyToRenderTarget(image, renderTarget = null, flipY = false) {
+  copyTexture(source, flipY = false) {
     const {
       gl, defaultShaderProgram, positionAttributeLocation, positionBuffer, texCoordAttributeLocation, isImageLoaded
     } = this.state;
 
-    if (!isImageLoaded) {
+    if (!source) {
+      console.log('empty image to copy');
       return;
     }
 
@@ -188,16 +155,10 @@ class DrawingPage extends Component {
       return;
     }
 
-    if (renderTarget) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget);
-    }
-
     gl.useProgram(defaultShaderProgram);
 
     gl.enableVertexAttribArray(positionAttributeLocation);
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    
-    console.log("CopyTexture");
 
     // Для вершинного shader'a
     // Указываем атрибуту positionAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
@@ -219,7 +180,7 @@ class DrawingPage extends Component {
     // Для фрагментного shader'a
     // bind texture samples
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, image);
+    gl.bindTexture(gl.TEXTURE_2D, source.texture);
     gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, "u_sampler"), 0);
     gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, "u_flipY"), flipY);
 
@@ -228,18 +189,15 @@ class DrawingPage extends Component {
     offset = 0;
     const count = 4; // количество вершин
     gl.drawArrays(primitiveType, offset, count);
-
-    if (renderTarget) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
   }
 
-  bwImage(image, renderTarget){
+  bwImage(source){
     const {
       gl, bwShaderProgram, positionAttributeLocation, positionBuffer, texCoordAttributeLocation, isImageLoaded
     } = this.state;
 
-    if (!isImageLoaded) {
+    if (!source) {
+      console.log('empty image to filter');
       return;
     }
 
@@ -254,10 +212,6 @@ class DrawingPage extends Component {
     if (texCoordAttributeLocation === -1) {
       console.log('texCoordAttributeLocation');
       return;
-    }
-
-    if (renderTarget) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget);
     }
 
     gl.useProgram(bwShaderProgram);
@@ -285,7 +239,7 @@ class DrawingPage extends Component {
     // Для фрагментного shader'a
     // bind texture samples
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, image);
+    gl.bindTexture(gl.TEXTURE_2D, source.texture);
     gl.uniform1i(gl.getUniformLocation(bwShaderProgram, "u_sampler"), 0);
     gl.uniform1i(gl.getUniformLocation(bwShaderProgram, "u_flipY"), 0);
 
@@ -294,21 +248,13 @@ class DrawingPage extends Component {
     offset = 0;
     const count = 4; // количество вершин
     gl.drawArrays(primitiveType, offset, count);
-
-    if (renderTarget) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
   }
 
-  blurImage(image, blurSize, tempRenderTarget, tempRenderTexture, renderTarget) {
+  blurImage(source, blurSize, tempTexture) {
     const {
       gl, blurShaderProgram, positionAttributeLocation, positionBuffer, texCoordAttributeLocation,
-      canvasHeight, canvasWidth, isImageLoaded
+      canvasHeight, canvasWidth, isImageLoaded, render
     } = this.state;
-
-    if (!isImageLoaded) {
-      return;
-    }
 
     if (!blurShaderProgram) {
       console.log('blurShaderProgram');
@@ -348,13 +294,13 @@ class DrawingPage extends Component {
     // Для фрагментного shader'a
     // bind texture samples
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, image);
+    gl.bindTexture(gl.TEXTURE_2D, source.texture);
     gl.uniform1i(gl.getUniformLocation(blurShaderProgram, "u_sampler"), 0);
     gl.uniform1f(gl.getUniformLocation(blurShaderProgram, "u_sigma"), blurSize);
     gl.uniform2fv(gl.getUniformLocation(blurShaderProgram, "u_dir"), [1.0 / canvasWidth, 0.0]);
     gl.uniform1i(gl.getUniformLocation(blurShaderProgram, "u_flipY"), 0);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, tempRenderTarget);
+    render.pushRenderTarget(tempTexture);
 
     // Для отправки на отрисовку
     const primitiveType = gl.TRIANGLE_STRIP;
@@ -362,46 +308,19 @@ class DrawingPage extends Component {
     const count = 4; // количество вершин
     gl.drawArrays(primitiveType, offset, count);
 
-    if (renderTarget) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget);
-    } else {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
+    render.popRenderTarget();
 
-    gl.bindTexture(gl.TEXTURE_2D, tempRenderTexture);
+    gl.bindTexture(gl.TEXTURE_2D, tempTexture.texture);
 
     gl.uniform2fv(gl.getUniformLocation(blurShaderProgram, "u_dir"), [0.0, 1.0 / canvasHeight]);
     gl.uniform1i(gl.getUniformLocation(blurShaderProgram, "u_flipY"), 1);
 
     gl.drawArrays(primitiveType, offset, count);
-
-    if (renderTarget) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
   }
 
   createRenderTarget() {
-    const { gl, canvasWidth, canvasHeight, render } = this.state;
-    const target = render.createRenderTarget(canvasWidth, canvasHeight);
-    return { renderTexture: target.texture, frameBuffer: target.renderTarget };
-
-    //const renderTexture = gl.createTexture();
-    //gl.bindTexture(gl.TEXTURE_2D, renderTexture);
-    //gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvasWidth, canvasHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    //
-    ////const frameBuffer = gl.createFramebuffer();
-    ////gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
-    ////const attachmentPoint = gl.COLOR_ATTACHMENT0;
-    ////gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, renderTexture, 0);
-    ////gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    //
-    //gl.bindTexture(gl.TEXTURE_2D, null);
-    //
-    //// this.setState({ renderBuffer1, frameBuffer});
-    //return { renderTexture, frameBuffer };
+    const { canvasWidth, canvasHeight, render } = this.state;
+    return render.createRenderTarget(canvasWidth, canvasHeight);;
   }
 
   createShader(gl, type, source) {

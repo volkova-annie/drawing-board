@@ -6,18 +6,20 @@ export default class Render {
     this.renderTargets = [];
   }
 
-  pushRenderTarget(renderTarget) {
-    this.renderTargets.push(renderTarget);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget);
+  updateRenderTarget() {
+    const idx = this.renderTargets.length - 1;
+    const currentRT = idx >= 0 ? this.renderTargets[idx] : null;
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, currentRT);
+  }
+
+  pushRenderTarget(texture) {
+    this.renderTargets.push(texture.renderTarget);
+    this.updateRenderTarget();
   }
 
   popRenderTarget() {
     this.renderTargets.pop();
-    if (this.renderTargets.length > 0) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.renderTargets[this.renderTargets.length - 1]);
-    } else {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
+    this.updateRenderTarget();
   }
 
   createRenderTarget(width, height) {
@@ -27,6 +29,4 @@ export default class Render {
   createTexture(image) {
     return new Texture(this.gl, image.clientWidth, image.clientHeight, image, false);
   }
-
-
 }
