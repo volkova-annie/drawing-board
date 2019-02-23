@@ -1,85 +1,13 @@
 import React, { Component } from 'react';
-import styles from './styles.css';
-
+import Render from './render/render'
+import {
+  vertexShaderSource,
+  blurFragmentShaderSource,
+  bwFragmentShaderSource,
+  defaultFragmentShaderSource
+} from './render/shaders';
 import reign_image from '../../images/rhein.jpg'
 
-const veterxShaderSource = `
-  // атрибут, который будет получать данные из буфера
-  attribute vec4 a_position;
-  attribute vec2 a_texCoord;
-  
-  varying highp vec2 v_texCoord;
-  
-  uniform bool u_flipY;
-  
-  // все шейдеры имеют функцию main
-  void main() {
-
-  // gl_Position - специальная переменная вершинного шейдера,
-  // которая отвечает за установку положения
-  gl_Position = a_position;
-  v_texCoord = vec2(a_texCoord.x, u_flipY ? 1.0 - a_texCoord.y : a_texCoord.y);
-}`;
-
-const blurFragmentShaderSource = `
-  // фрагментные шейдеры не имеют точности по умолчанию, поэтому нам необходимо её
-  // указать. mediump подойдёт для большинства случаев. Он означает "средняя точность"
-
-  precision mediump float;
- 
-  varying highp vec2 v_texCoord;
-
-  uniform sampler2D u_sampler;
-  uniform float     u_sigma;  // Gaussian sigma
-  uniform vec2      u_dir;    // horiz=(1.0, 0.0), vert=(0.0, 1.0)
-
-  #define PI 3.141593
-  #define MAX_STEPS 30
-
-  void main() {
-    vec2 loc = v_texCoord; // center pixel cooordinate
-    vec4 acc; // accumulator
-    acc = texture2D(u_sampler, loc); // accumulate center pixel
-    if (u_sigma > 0.0) {
-      for (int i = 1; i <= MAX_STEPS; i++) {
-        float coeff = exp(-0.5 * float(i) * float(i) / (u_sigma * u_sigma));
-        acc += (texture2D(u_sampler, loc - float(i) * u_dir)) * coeff; // L
-        acc += (texture2D(u_sampler, loc + float(i) * u_dir)) * coeff; // R
-      }
-      acc *= 1.0 / (sqrt(2.0 * PI) * u_sigma); // normalize for unity gain
-    }
-
-    gl_FragColor = acc;
-  }`;
-
-const bwFragmentShaderSource = `
-  precision mediump float;
- 
-  varying highp vec2 v_texCoord;
-
-  uniform sampler2D u_sampler;
-
-  void main() {
-    vec2 loc = v_texCoord; // center pixel cooordinate
-    vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
-    float bw = (acc.r + acc.g + acc.b) / 3.0; // берем сумму всех каналов и нормализуем его, чтобы значение было от 0 до 1
-    
-    gl_FragColor = vec4(vec3(bw), 1.0);
-  }`;
-
-const defaultFragmentShaderSource = `
-  precision mediump float;
- 
-  varying highp vec2 v_texCoord;
-
-  uniform sampler2D u_sampler;
-
-  void main() {
-    vec2 loc = v_texCoord; // center pixel cooordinate
-    vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
-    
-    gl_FragColor = vec4(acc, 1.0);
-  }`;
 
 // три двумерных точки
 const quadVertices = [
@@ -103,7 +31,9 @@ class DrawingPage extends Component {
       canvasWidth: 1024,
       canvasHeight: 512,
       gl: null,
+      render: null,
       blurShaderProgram: null,
+      lennaImage: null,
       bwShaderProgram: null,
       defaultShaderProgram: null,
       positionAttributeLocation: -1,
@@ -129,9 +59,9 @@ class DrawingPage extends Component {
       return;
     }
 
-    this.setState({ gl: gl });
+    this.setState({ gl: gl, render: new Render(gl) });
 
-    const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, veterxShaderSource);
+    const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const blurFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, blurFragmentShaderSource);
     const bwFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, bwFragmentShaderSource);
     const defaultFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, defaultFragmentShaderSource);
@@ -144,35 +74,51 @@ class DrawingPage extends Component {
       bwShaderProgram: this.createProgram(gl, vertexShader, bwFragmentShader),
       defaultShaderProgram: this.createProgram(gl, vertexShader, defaultFragmentShader),
       positionBuffer: gl.createBuffer(),
-      lennaImage: gl.createTexture(),
+      lennaImage: gl.createTexture()
     }, () => {
       const { frameBuffer: frameBuffer1, renderTexture: renderTexture1 } = this.createRenderTarget();
       const { frameBuffer: frameBuffer2, renderTexture: renderTexture2 } = this.createRenderTarget();
-      this.setState({
-        positionAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_position"),
-        texCoordAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_texCoord"),
-        // Создание промежуточного буффера отображения (картинка, в которую рисуем)
-        renderBuffer1: frameBuffer1,
-        renderTexture1: renderTexture1,
-        renderBuffer2: frameBuffer2,
-        renderTexture2: renderTexture2
-      });
+
+      this.createRenderBuffer(gl, frameBuffer1, renderTexture1, frameBuffer2, renderTexture2);
+
       // В переменной ARRAY_BUFFER находится this.state.positionBuffer
       gl.bindBuffer(gl.ARRAY_BUFFER, this.state.positionBuffer);
       // В ARRAY_BUFFER передаем quadVertices и флаг, что структура не будет меняться
       console.log();
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadVertices), gl.STATIC_DRAW);
+
+
+      //fetch(reign_image)
+      //  .then(function(response) {
+      //    return response.blob()
+      //  })
+      //  .then((blob) => {
+      //    const reader = new FileReader();
+      //    reader.onloadend = () => {
+      //      this.setState({ lennaImage: this.state.render.createTexture(reader.result).texture});
+      //
+      //      this.setState({ isImageLoaded: true });
+      //    };
+      //
+      //    reader.readAsArrayBuffer(blob);
+      //  });
+
       // load image
       const image = new Image();
       image.onload = () => {
-        gl.bindTexture(gl.TEXTURE_2D, this.state.lennaImage);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
-        gl.generateMipmap(gl.TEXTURE_2D);
-        gl.bindTexture(gl.TEXTURE_2D, null);
+        //console.log("asd");
+        console.log(image);
+        this.setState({ lennaImage: this.state.render.createTexture(image).texture });
+      //  console.log(image);
+      //
+      //  gl.bindTexture(gl.TEXTURE_2D, this.state.lennaImage);
+      //  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      //  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      //  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      //  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      //  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+      //  gl.generateMipmap(gl.TEXTURE_2D);
+      //  gl.bindTexture(gl.TEXTURE_2D, null);
 
         this.setState({ isImageLoaded: true });
       };
@@ -186,6 +132,18 @@ class DrawingPage extends Component {
     setInterval(this.renderGL, 100);
   }
 
+  createRenderBuffer(gl, frameBuffer1, renderTexture1, frameBuffer2, renderTexture2) {
+    this.setState({
+      positionAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_position"),
+      texCoordAttributeLocation: gl.getAttribLocation(this.state.blurShaderProgram, "a_texCoord"),
+      // Создание промежуточного буффера отображения (картинка, в которую рисуем)
+      renderBuffer1: frameBuffer1,
+      renderTexture1: renderTexture1,
+      renderBuffer2: frameBuffer2,
+      renderTexture2: renderTexture2
+    });
+  }
+
   renderGL() {
     const {
       gl, lennaImage, blurSize, isBlackAndWhite, renderBuffer1,
@@ -197,6 +155,9 @@ class DrawingPage extends Component {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     //this.blurImage(lennaImage, blurSize);
+    //this.copyToRenderTarget(lennaImage, null);
+
+    //this.copyToRenderTarget(lennaImage);
     this.copyToRenderTarget(lennaImage, renderBuffer1);
     if (isBlackAndWhite) {
       this.bwImage(lennaImage, renderBuffer1);
@@ -235,6 +196,8 @@ class DrawingPage extends Component {
 
     gl.enableVertexAttribArray(positionAttributeLocation);
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    
+    console.log("CopyTexture");
 
     // Для вершинного shader'a
     // Указываем атрибуту positionAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
@@ -418,24 +381,27 @@ class DrawingPage extends Component {
   }
 
   createRenderTarget() {
-    const { gl, canvasWidth, canvasHeight } = this.state;
-    const renderTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, renderTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvasWidth, canvasHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const { gl, canvasWidth, canvasHeight, render } = this.state;
+    const target = render.createRenderTarget(canvasWidth, canvasHeight);
+    return { renderTexture: target.texture, frameBuffer: target.renderTarget };
 
-    const frameBuffer = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
-    const attachmentPoint = gl.COLOR_ATTACHMENT0;
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, renderTexture, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-    gl.bindTexture(gl.TEXTURE_2D, null);
-
-    // this.setState({ renderBuffer1, frameBuffer});
-    return { renderTexture, frameBuffer };
+    //const renderTexture = gl.createTexture();
+    //gl.bindTexture(gl.TEXTURE_2D, renderTexture);
+    //gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvasWidth, canvasHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    //
+    ////const frameBuffer = gl.createFramebuffer();
+    ////gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+    ////const attachmentPoint = gl.COLOR_ATTACHMENT0;
+    ////gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, renderTexture, 0);
+    ////gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    //
+    //gl.bindTexture(gl.TEXTURE_2D, null);
+    //
+    //// this.setState({ renderBuffer1, frameBuffer});
+    //return { renderTexture, frameBuffer };
   }
 
   createShader(gl, type, source) {
