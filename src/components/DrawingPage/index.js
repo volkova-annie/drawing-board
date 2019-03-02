@@ -11,6 +11,7 @@ class DrawingPage extends Component {
     this.handleReset = this.handleReset.bind(this);
     this.handleChange = this.handleChange.bind(this);
     this.handleBW = this.handleBW.bind(this);
+    this.handleAnimate = this.handleAnimate.bind(this);
     this.state = {
       blurRadius: 0
     }
@@ -23,10 +24,15 @@ class DrawingPage extends Component {
   handleReset() {
     this.updateSliderValue(0);
     this.board.resetBlackAndWhite();
+    this.board.resetAnimation();
   }
 
   handleBW() {
     this.board.makeBlackWhite();
+  }
+
+  handleAnimate() {
+    this.board.addAnimation();
   }
 
   handleChange(event) {
@@ -60,6 +66,9 @@ class DrawingPage extends Component {
           {/*<button disabled={true} onClick={() => this.board.clear()} className={styles.disabled}>Clear</button>*/}
           <button onClick={ this.handleBW }>
             Black&White
+          </button>
+          <button onClick={ this.handleAnimate }>
+            Animate me
           </button>
           <button
             onClick={ this.handleReset }

@@ -75,3 +75,28 @@ export const defaultFragmentShaderSource = `
     
     gl_FragColor = vec4(acc, 1.0);
   }`;
+
+export const waterAnimationFragmentShaderSource = `
+  precision mediump float;
+  
+  varying highp vec2 v_texCoord;
+
+  uniform sampler2D u_sampler;
+  
+  uniform float u_currentTime;
+  
+  float rand(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898, 78.233))) * 43758.5453);
+  }
+
+  void main() {
+    float sinScale = 0.01;
+    float cosScale = 0.005;
+    float timeline = u_currentTime - 0.5;
+    float noise = rand(v_texCoord) * 0.05;
+    vec2 dudv = vec2(cos((v_texCoord.y + timeline + noise) / cosScale) * cosScale, sin((v_texCoord.x + timeline + noise) / sinScale) * sinScale);
+    vec2 loc = v_texCoord + dudv;
+    vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
+    
+    gl_FragColor = vec4(acc, 1.0);
+  }`;

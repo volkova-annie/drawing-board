@@ -1,24 +1,57 @@
 import Texture from './texture'
 
 export default class Render {
-  constructor(gl) {
+  constructor(gl, width, height) {
+    console.assert(width > 1 && height > 1);
     this.gl = gl;
-    this.renderTargets = [];
+    this.renderTargetsStack = [];
+    this.width = width;
+    this.height = height;
+    this._frontBuffer = this.createRenderTarget(this.width, this.height);
+    this.availableRTs = {};
+    this.createRTs();
+  }
+
+  beginFrame() {
+    this.renderTargetsStack = [];
+    this.pushRenderTarget(this._frontBuffer);
+
+    // очищаем canvas
+    this.gl.clearColor(0, 1, 1, 0);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+  }
+
+  endFrame(copyFunc) {
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+    copyFunc(this._frontBuffer, true);
+  }
+
+  get frontBuffer() {
+    return this._frontBuffer;
+  }
+
+  createRTs() {
+    this.availableRTs = {
+      fullResA: this.createRenderTarget(this.width, this.height),
+      fullResB: this.createRenderTarget(this.width, this.height)
+    }
   }
 
   updateRenderTarget() {
-    const idx = this.renderTargets.length - 1;
-    const currentRT = idx >= 0 ? this.renderTargets[idx] : null;
-    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, currentRT);
+    const idx = this.renderTargetsStack.length - 1;
+    const currentRT = idx >= 0 ? this.renderTargetsStack[idx] : null;
+    currentRT.bindAsRenderTarget();
   }
 
   pushRenderTarget(texture) {
-    this.renderTargets.push(texture.renderTarget);
+    //console.assert(this.renderTargetsStack.length == 0 || this.renderTargetsStack[this.renderTargetsStack.length - 1] != texture);
+    this.renderTargetsStack.push(texture);
     this.updateRenderTarget();
   }
 
   popRenderTarget() {
-    this.renderTargets.pop();
+    const last = this.renderTargetsStack.pop();
+    last.unbindAsRenderTarget();
     this.updateRenderTarget();
   }
 
