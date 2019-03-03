@@ -74,51 +74,56 @@ class DrawingPage extends Component {
   render() {
     return (
       <div className={styles.wrapper}>
-        <div>
-          <div className={styles.panelRow}>
-            <label htmlFor="blur">Blur radius:</label>
-            <input
-              id="blur"
-              type="range"
-              min="0"
-              max="10"
-              value={ this.state.blurRadius }
-              onChange={ this.handleBlur }
-            />
-            <button onClick={ this.handleBW }>
-              Black&White
-            </button>
-            <button onClick={ this.handleAnimate }>
-              Animate me
-            </button>
-            <button
-              onClick={ this.handleReset }>
-              Reset
-            </button>
+        <div className={styles.panelRow}>
+          <div className={styles.rangesZone}>
+            <label htmlFor="blur">
+              <span className={styles.rangeCaption}>Blur radius:</span>
+              <input
+                id="blur"
+                type="range"
+                min="0"
+                max="10"
+                value={ this.state.blurRadius }
+                onChange={ this.handleBlur }
+              />
+              { this.state.blurRadius }
+            </label>
+            <label htmlFor="rotate">
+              <span className={styles.rangeCaption}>Rotation:</span>
+              <input
+                id="rotate"
+                type="range"
+                min="-180"
+                max="180"
+                value={ this.state.rotationAngle }
+                onChange={ this.handleRotate }
+              />
+              { this.state.rotationAngle } &#176;
+            </label>
+            <label htmlFor="scale">
+              <span className={styles.rangeCaption}>Zoom:</span>
+              <input
+                id="scale"
+                type="range"
+                min="0.1"
+                max="2"
+                step="0.1"
+                value={ this.state.scale }
+                onChange={ this.handleScale }
+              />
+              { (this.state.scale * 100).toFixed() } %
+            </label>
           </div>
-          <div className={styles.panelRow}>
-            <label htmlFor="rotate">Rotation:</label>
-            <input
-              id="rotate"
-              type="range"
-              min="-180"
-              max="180"
-              value={ this.state.rotationAngle }
-              onChange={ this.handleRotate }
-            />
-          </div>
-          <div className={styles.panelRow}>
-            <label htmlFor="scale">Zoom:</label>
-            <input
-              id="scale"
-              type="range"
-              min="1"
-              max="2"
-              step="0.1"
-              value={ this.state.scale }
-              onChange={ this.handleScale }
-            />
-          </div>
+          <button onClick={ this.handleBW }>
+            Black&White
+          </button>
+          <button onClick={ this.handleAnimate }>
+            Animate me
+          </button>
+          <button
+            onClick={ this.handleReset }>
+            Reset
+          </button>
         </div>
         <DrawingBoard width="700px" height="500px" ref={instance => {this.board = instance}} />
       </div>
