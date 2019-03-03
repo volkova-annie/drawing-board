@@ -1,15 +1,15 @@
-.panel {
+.panelRow {
   display: flex;
   align-items: center;
   margin-bottom: 10px;
 }
 
-.panel button {
+.panelRow button {
   margin: 10px;
   cursor: pointer;
 }
 
-.panel button.disabled {
+.panelRow button.disabled {
   cursor: not-allowed;
 }
 

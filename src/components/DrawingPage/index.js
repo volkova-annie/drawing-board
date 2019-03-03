@@ -9,11 +9,15 @@ class DrawingPage extends Component {
 
     this.getColor = this.getColor.bind(this);
     this.handleReset = this.handleReset.bind(this);
-    this.handleChange = this.handleChange.bind(this);
+    this.handleBlur = this.handleBlur.bind(this);
     this.handleBW = this.handleBW.bind(this);
     this.handleAnimate = this.handleAnimate.bind(this);
+    this.handleRotate = this.handleRotate.bind(this);
+    this.handleScale = this.handleScale.bind(this);
     this.state = {
-      blurRadius: 0
+      blurRadius: 0,
+      rotationAngle: 0,
+      scale: 1
     }
   };
 
@@ -22,7 +26,9 @@ class DrawingPage extends Component {
   }
 
   handleReset() {
-    this.updateSliderValue(0);
+    this.updateBlurValue(0);
+    this.updateRotationAngle(0);
+    this.updateScale(1);
     this.board.resetBlackAndWhite();
     this.board.resetAnimation();
   }
@@ -35,46 +41,84 @@ class DrawingPage extends Component {
     this.board.addAnimation();
   }
 
-  handleChange(event) {
-    const value = event.target.value;
-    this.updateSliderValue(value);
+  handleBlur(event) {
+    const { value } = event.target;
+    this.updateBlurValue(value);
   }
 
-  updateSliderValue(value) {
+  updateBlurValue(value) {
     this.board.setBlurRadius(value);
     this.setState({ blurRadius: value});
+  }
+
+  handleRotate(event) {
+    const { value } = event.target;
+    this.updateRotationAngle(value);
+  }
+
+  updateRotationAngle(value) {
+    this.board.setRotationAngle(value);
+    this.setState({ rotationAngle: value});
+  }
+
+  handleScale(event) {
+    const { value } = event.target;
+    this.updateScale(value);
+  }
+
+  updateScale(value) {
+    this.board.setScale(value);
+    this.setState({ scale: value});
   }
 
   render() {
     return (
       <div className={styles.wrapper}>
-        <div className={styles.panel}>
-          {/*<label htmlFor="color">*/}
-            {/*Choose color:*/}
-          {/*</label>*/}
-          {/*<input id="color" type="color" />*/}
-          <label htmlFor="blur">Blur radius:</label>
-          <input
-            id="blur"
-            type="range"
-            min="0"
-            max="10"
-            value={ this.state.blurRadius }
-            onChange={ this.handleChange }
-          />
-          {/*<button disabled={true} onClick={() => this.board.fill(this.getColor())} className={styles.disabled}>Fill</button>*/}
-          {/*<button disabled={true} onClick={() => this.board.clear()} className={styles.disabled}>Clear</button>*/}
-          <button onClick={ this.handleBW }>
-            Black&White
-          </button>
-          <button onClick={ this.handleAnimate }>
-            Animate me
-          </button>
-          <button
-            onClick={ this.handleReset }
-            className={styles.clear}>
-            Reset
-          </button>
+        <div>
+          <div className={styles.panelRow}>
+            <label htmlFor="blur">Blur radius:</label>
+            <input
+              id="blur"
+              type="range"
+              min="0"
+              max="10"
+              value={ this.state.blurRadius }
+              onChange={ this.handleBlur }
+            />
+            <button onClick={ this.handleBW }>
+              Black&White
+            </button>
+            <button onClick={ this.handleAnimate }>
+              Animate me
+            </button>
+            <button
+              onClick={ this.handleReset }>
+              Reset
+            </button>
+          </div>
+          <div className={styles.panelRow}>
+            <label htmlFor="rotate">Rotation:</label>
+            <input
+              id="rotate"
+              type="range"
+              min="-180"
+              max="180"
+              value={ this.state.rotationAngle }
+              onChange={ this.handleRotate }
+            />
+          </div>
+          <div className={styles.panelRow}>
+            <label htmlFor="scale">Zoom:</label>
+            <input
+              id="scale"
+              type="range"
+              min="1"
+              max="2"
+              step="0.1"
+              value={ this.state.scale }
+              onChange={ this.handleScale }
+            />
+          </div>
         </div>
         <DrawingBoard width="700px" height="500px" ref={instance => {this.board = instance}} />
       </div>

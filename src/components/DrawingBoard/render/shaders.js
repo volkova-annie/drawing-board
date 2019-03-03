@@ -1,18 +1,24 @@
 export const vertexShaderSource = `
   // атрибут, который будет получать данные из буфера
-  attribute vec4 a_position;
+  attribute vec3 a_position;
   attribute vec2 a_texCoord;
   
   varying highp vec2 v_texCoord;
   
   uniform bool u_flipY;
+  uniform mat3 u_transform;
+  uniform vec2 u_resolution;
   
   // все шейдеры имеют функцию main
   void main() {
 
+
+  vec3 transformedPosition = u_transform * a_position;
+  transformedPosition.xy *= 2.0 / u_resolution;
+  
   // gl_Position - специальная переменная вершинного шейдера,
   // которая отвечает за установку положения
-  gl_Position = a_position;
+  gl_Position = vec4(transformedPosition, 1.0);
   v_texCoord = vec2(a_texCoord.x, u_flipY ? 1.0 - a_texCoord.y : a_texCoord.y);
 }`;
 
