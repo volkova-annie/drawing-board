@@ -11,16 +11,14 @@ export const vertexShaderSource = `
   
   // все шейдеры имеют функцию main
   void main() {
-
-
-  vec3 transformedPosition = u_transform * a_position;
-  transformedPosition.xy *= 2.0 / u_resolution;
-  
-  // gl_Position - специальная переменная вершинного шейдера,
-  // которая отвечает за установку положения
-  gl_Position = vec4(transformedPosition, 1.0);
-  v_texCoord = vec2(a_texCoord.x, u_flipY ? 1.0 - a_texCoord.y : a_texCoord.y);
-}`;
+    vec3 transformedPosition = u_transform * a_position;
+    transformedPosition.xy *= 2.0 / u_resolution;
+    
+    // gl_Position - специальная переменная вершинного шейдера,
+    // которая отвечает за установку положения
+    gl_Position = vec4(transformedPosition, 1.0);
+    v_texCoord = vec2(a_texCoord.x, u_flipY ? 1.0 - a_texCoord.y : a_texCoord.y);
+  }`;
 
 export const blurFragmentShaderSource = `
   // фрагментные шейдеры не имеют точности по умолчанию, поэтому нам необходимо её
@@ -105,4 +103,38 @@ export const waterAnimationFragmentShaderSource = `
     vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
     
     gl_FragColor = vec4(acc, 1.0);
+  }`;
+
+export const vertexPlanetShaderSource = `
+  // атрибут, который будет получать данные из буфера
+  attribute vec3 a_position;
+  attribute vec3 a_texCoord;
+  
+  varying highp vec3 v_texCoord;
+  
+  uniform mat4 u_transform;
+  uniform mat4 u_projection;
+  
+  // все шейдеры имеют функцию main
+  void main() {
+    vec4 transformedPosition = u_projection * u_transform * vec4(a_position, 1.0);
+    
+    // gl_Position - специальная переменная вершинного шейдера,
+    // которая отвечает за установку положения
+    gl_Position = transformedPosition; // vec4(transformedPosition, 1.0);
+    v_texCoord = a_texCoord;
+  }`;
+
+export const planetFragmentShaderSource = `
+  precision mediump float;
+ 
+  varying highp vec3 v_texCoord;
+
+  uniform sampler2D u_sampler;
+
+  void main() {
+    // vec2 loc = v_texCoord; // center pixel cooordinate
+    // vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
+    
+    gl_FragColor = vec4(v_texCoord, 1.0);
   }`;

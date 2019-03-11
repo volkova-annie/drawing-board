@@ -32,6 +32,13 @@ export default class Texture {
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
       const attachmentPoint = gl.COLOR_ATTACHMENT0;
       gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, this.texture, 0);
+
+      const depthBuffer = gl.createRenderbuffer();
+      gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
+      // make a depth buffer and the same size as the targetTexture
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
+
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 

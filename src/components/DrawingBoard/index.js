@@ -1,13 +1,13 @@
 import React, { Component } from 'react';
 import * as math from 'mathjs';
-import Render from './render/render'
+import Render from '../../render/render'
 import {
   vertexShaderSource,
   blurFragmentShaderSource,
   bwFragmentShaderSource,
   defaultFragmentShaderSource,
   waterAnimationFragmentShaderSource
-} from './render/shaders';
+} from '../../render/shaders';
 import reign_image from '../../images/rhein.jpg'
 
 class DrawingPage extends Component {
@@ -48,19 +48,20 @@ class DrawingPage extends Component {
       return;
     }
 
-    const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
-    const blurFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, blurFragmentShaderSource);
-    const bwFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, bwFragmentShaderSource);
-    const defaultFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, defaultFragmentShaderSource);
-    const waterAnimationFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, waterAnimationFragmentShaderSource);
+    const render = new Render(gl, this.state.canvasWidth, this.state.canvasHeight);
+
+    const vertexShader = render.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+    const blurFragmentShader = render.createShader(gl, gl.FRAGMENT_SHADER, blurFragmentShaderSource);
+    const bwFragmentShader = render.createShader(gl, gl.FRAGMENT_SHADER, bwFragmentShaderSource);
+    const defaultFragmentShader = render.createShader(gl, gl.FRAGMENT_SHADER, defaultFragmentShaderSource);
+    const waterAnimationFragmentShader = render.createShader(gl, gl.FRAGMENT_SHADER, waterAnimationFragmentShaderSource);
 
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-    const render = new Render(gl, this.state.canvasWidth, this.state.canvasHeight);
-    const blurShaderProgram = this.createProgram(gl, vertexShader, blurFragmentShader);
-    const bwShaderProgram = this.createProgram(gl, vertexShader, bwFragmentShader);
-    const defaultShaderProgram = this.createProgram(gl, vertexShader, defaultFragmentShader);
-    const waterAnimationShaderProgram = this.createProgram(gl, vertexShader, waterAnimationFragmentShader);
+    const blurShaderProgram = render.createProgram(gl, vertexShader, blurFragmentShader);
+    const bwShaderProgram = render.createProgram(gl, vertexShader, bwFragmentShader);
+    const defaultShaderProgram = render.createProgram(gl, vertexShader, defaultFragmentShader);
+    const waterAnimationShaderProgram = render.createProgram(gl, vertexShader, waterAnimationFragmentShader);
 
     this.setState({
       gl,
@@ -98,7 +99,7 @@ class DrawingPage extends Component {
     if (isAnimated) {
       this.animateImage(lennaImage);
     } else {
-      this.copyTexture(lennaImage, this.getTransform());
+      render.copyTexture(lennaImage, this.getTransform());
     }
 
     if (isBlackAndWhite) {
@@ -106,13 +107,13 @@ class DrawingPage extends Component {
       this.bwImage(render.frontBuffer);
       render.popRenderTarget();
 
-      this.copyTexture(render.availableRTs.fullResA, this.getTransform());
+      render.copyTexture(render.availableRTs.fullResA, this.getTransform());
     }
 
     this.blurImage(render.frontBuffer, blurSize, render.availableRTs.fullResA);
 
     const transform = this.getTransform(scale, rotateAngleDegree);
-    render.endFrame((source, flip) => { this.copyTexture(source, transform, flip); } ); // todo: move to Render
+    render.endFrame(transform); // todo: move to Render transform!!
   }
   
   getTransform(scale = 1, rotateAngleDegree = 0) {
@@ -134,32 +135,6 @@ class DrawingPage extends Component {
     matrix = math.multiply(matrix, rotateAroundZ, scaleXY);
     const result = math.flatten(matrix).toArray();
     return result;
-  }
-
-  copyTexture(source, transform, flipY = false) {
-    const { gl, defaultShaderProgram, render } = this.state;
-
-    if (!source) {
-      console.log('empty image to copy');
-      return;
-    }
-
-    if (!defaultShaderProgram) {
-      console.log('defaultShaderProgram');
-      return;
-    }
-
-    gl.useProgram(defaultShaderProgram);
-
-    // Для фрагментного shader'a
-    // bind texture samples
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, source.texture);
-    gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, 'u_sampler'), 0);
-    gl.uniform1i(gl.getUniformLocation(defaultShaderProgram, 'u_flipY'), flipY);
-    gl.uniformMatrix3fv(gl.getUniformLocation(defaultShaderProgram, 'u_transform'), false, transform);
-
-    render.drawFullScreenQuad(defaultShaderProgram);
   }
 
   bwImage(source){
@@ -263,36 +238,6 @@ class DrawingPage extends Component {
   createRenderTarget() {
     const { canvasWidth, canvasHeight, render } = this.state;
     return render.createRenderTarget(canvasWidth, canvasHeight);;
-  }
-
-  createShader(gl, type, source) {
-    const shader = gl.createShader(type);   // создание шейдера
-    gl.shaderSource(shader, source);        // устанавливаем шейдеру его программный код
-    gl.compileShader(shader);               // компилируем шейдер
-    const success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
-    if (success) {                          // если компиляция прошла успешно - возвращаем шейдер
-      // console.log('Compiled shader!', source);
-      return shader;
-    }
-    
-    console.log('Failed to compile', source);
-    console.log(gl.getShaderInfoLog(shader));
-    gl.deleteShader(shader);
-  }
-
-  createProgram(gl, vertexShader, fragmentShader) {
-    const program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    const success = gl.getProgramParameter(program, gl.LINK_STATUS);
-    if (success) {
-      // console.log('Linked shaders!');
-      return program;
-    }
-
-    console.log(gl.getProgramInfoLog(program));
-    gl.deleteProgram(program);
   }
 
   makeBlackWhite() {
