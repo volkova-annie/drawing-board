@@ -59,16 +59,24 @@ class Planet extends Component {
     const FRACTION = 10000;
     const currentTime = (new Date().getTime() % FRACTION) / FRACTION;
 
-    const modelTransform = this.getTransform(0.1, currentTime * 360, currentTime * 360);
+    const modelTransform = this.getTransform(0.1, currentTime * 360, currentTime * 360, -0.3);
 
     gl.useProgram(planetShaderProgram);
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_projection'), false, this.getPerspectiveMatrix());
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelTransform);
 
     render.drawCube(planetShaderProgram);
+
+    const modelTetraTransform = this.getTransform(0.1, 45, currentTime * 360, 0.1);
+    gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelTetraTransform);
+    render.drawTetrahedron(planetShaderProgram);
+
+    const modelPlanetTransform = this.getTransform(0.1, currentTime * 360, currentTime * 360, 0.5);
+    gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelPlanetTransform);
+    render.drawPlanet(planetShaderProgram)
+
     const transform = this.getTransform3x3();
     render.endFrame(transform); // todo: move to Render
-
   }
 
   getPerspectiveMatrix() {
@@ -101,7 +109,7 @@ class Planet extends Component {
     return result;
   }
 
-  getTransform(scale = 1, rotateZ = 0, rotateY = 0) {
+  getTransform(scale = 1, rotateZ = 0, rotateY = 0, translateX = 0) {
     let matrix = math.identity(4);
     const scaleXY = math.matrix([
       [scale, 0,     0,  0],
@@ -114,7 +122,7 @@ class Planet extends Component {
       [1, 0, 0,  0],
       [0, 1, 0,  0],
       [0, 0, 1,  0],
-      [0.2, 0.0, -0.8,  1]
+      [translateX, 0.0, -0.8,  1]
     ]);
 
     const angle = rotateZ * Math.PI / 180;
@@ -160,8 +168,7 @@ class Planet extends Component {
       [0,  0, 1]
     ]);
     matrix = math.multiply(matrix, rotateAroundZ, scaleXY);
-    const result = math.flatten(matrix).toArray();
-    return result;
+    return math.flatten(matrix).toArray();
   }
 
     render() {

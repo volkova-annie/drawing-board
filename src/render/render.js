@@ -14,6 +14,10 @@ export default class Render {
     this.quadPositionBuffer = null;
     this.cubePositionBuffer = null;
     this.cubePositionIndecies = null;
+    this.tetrahedronPositionBuffer = null;
+    this.tetrahedronPositionIndecies = null;
+    this.planetPositionBuffer = null;
+    this.planetPositionIndecies = null;
 
     const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const defaultFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, defaultFragmentShaderSource);
@@ -55,7 +59,7 @@ export default class Render {
     this.pushRenderTarget(this._frontBuffer);
 
     // очищаем canvas
-    this.gl.clearColor(182 / 255, 16 / 255, 204 / 255, 1);
+    this.gl.clearColor(245 / 255, 232 / 255, 249 / 255, 1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
   }
 
@@ -160,34 +164,34 @@ export default class Render {
       const cubeVertices =
         [ // X, Y, Z           R, G, B
           // Top
-          -1.0, 1.0, -1.0,   0.5, 0.5, 0.5,
-          -1.0, 1.0, 1.0,    0.5, 0.5, 0.5,
-          1.0, 1.0, 1.0,     0.5, 0.5, 0.5,
-          1.0, 1.0, -1.0,    0.5, 0.5, 0.5,
+          -1.0, 1.0, -1.0,   0.2, 0.7, 0.9,
+          -1.0, 1.0, 1.0,    0.2, 0.7, 0.9,
+          1.0, 1.0, 1.0,     0.2, 0.7, 0.9,
+          1.0, 1.0, -1.0,    0.2, 0.7, 0.9,
 
           // Left
-          -1.0, 1.0, 1.0,    0.75, 0.25, 0.5,
-          -1.0, -1.0, 1.0,   0.75, 0.25, 0.5,
-          -1.0, -1.0, -1.0,  0.75, 0.25, 0.5,
-          -1.0, 1.0, -1.0,   0.75, 0.25, 0.5,
+          -1.0, 1.0, 1.0,    0.75, 0.25, 0.4,
+          -1.0, -1.0, 1.0,   0.75, 0.25, 0.4,
+          -1.0, -1.0, -1.0,  0.75, 0.25, 0.4,
+          -1.0, 1.0, -1.0,   0.75, 0.25, 0.4,
 
           // Right
-          1.0, 1.0, 1.0,    0.25, 0.25, 0.75,
-          1.0, -1.0, 1.0,   0.25, 0.25, 0.75,
-          1.0, -1.0, -1.0,  0.25, 0.25, 0.75,
-          1.0, 1.0, -1.0,   0.25, 0.25, 0.75,
+          1.0, 1.0, 1.0,    0.25, 0.25, 0.8,
+          1.0, -1.0, 1.0,   0.25, 0.25, 0.8,
+          1.0, -1.0, -1.0,  0.25, 0.25, 0.8,
+          1.0, 1.0, -1.0,   0.25, 0.25, 0.8,
 
           // Front
-          1.0, 1.0, 1.0,    1.0, 0.0, 0.15,
-          1.0, -1.0, 1.0,    1.0, 0.0, 0.15,
-          -1.0, -1.0, 1.0,    1.0, 0.0, 0.15,
-          -1.0, 1.0, 1.0,    1.0, 0.0, 0.15,
+          1.0, 1.0, 1.0,    1.0, 0.0, 0.2,
+          1.0, -1.0, 1.0,    1.0, 0.0, 0.2,
+          -1.0, -1.0, 1.0,    1.0, 0.0, 0.2,
+          -1.0, 1.0, 1.0,    1.0, 0.0, 0.2,
 
           // Back
-          1.0, 1.0, -1.0,    0.0, 1.0, 0.15,
-          1.0, -1.0, -1.0,    0.0, 1.0, 0.15,
-          -1.0, -1.0, -1.0,    0.0, 1.0, 0.15,
-          -1.0, 1.0, -1.0,    0.0, 1.0, 0.15,
+          1.0, 1.0, -1.0,    0.0, 1.0, 0.2,
+          1.0, -1.0, -1.0,    0.0, 1.0, 0.2,
+          -1.0, -1.0, -1.0,    0.0, 1.0, 0.2,
+          -1.0, 1.0, -1.0,    0.0, 1.0, 0.2,
 
           // Bottom
           -1.0, -1.0, -1.0,   0.5, 0.5, 1.0,
@@ -234,10 +238,13 @@ export default class Render {
       this.cubePositionIndecies = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.cubePositionIndecies);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(boxIndices), gl.STATIC_DRAW);
-
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
     }
 
-    return this.cubePositionBuffer;
+    return {
+      vertices: this.cubePositionBuffer,
+      indices: this.cubePositionIndecies
+    }
   }
 
   drawFullScreenQuad(shaderProgram) {
@@ -289,8 +296,8 @@ export default class Render {
     gl.frontFace(gl.CW);
     gl.cullFace(gl.BACK);
 
-    const positionBuffer = this.getCubePositionBuffer();
-    const idxBuffer = this.cubePositionIndecies;
+    const { vertices: positionBuffer, indices: idxBuffer } = this.getCubePositionBuffer();
+
     const positionAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_position');
     console.assert(positionAttributeLocation !== -1);
 
@@ -326,6 +333,260 @@ export default class Render {
     const count = 6 * 6; // количество вершин
     //gl.drawArrays(primitiveType, 0, count);
 
+    gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, 0);
+
+    gl.disable(gl.DEPTH_TEST); // todo restore state
+    gl.disable(gl.CULL_FACE);
+  }
+
+  getTetrahedronPositionBuffer() {
+    const { gl } = this;
+    if (!this.tetrahedronPositionBuffer) {
+      // 6 - граней куба, для каждой грани 2 треугольника (6 вершин) => 6 x 6 = 36 трехмерных точек
+
+      const tetrahedronVertices =
+        [ // X, Y, Z           R, G, B
+          // Front
+          -1.0, -1.0,  1.0,   0.0, 1.0, 0.0,
+           0.0,  0.75, 0.125, 0.0, 1.0, 0.0,
+           1.0, -1.0,  1.0,   0.0, 1.0, 0.0,
+
+          // Front Left
+          1.0, -1.0,  1.0,    1.0, 0.0, 1.0,
+          0.0,  0.75, 0.125,  1.0, 0.0, 1.0,
+          0.0, -1.0, -0.75,   1.0, 0.0, 1.0,
+
+          // Back
+           0.0, -1.0, -0.75,   1.0, 0.0, 0.0,
+           0.0,  0.75, 0.125,   1.0, 0.0, 0.0,
+          -1.0, -1.0,  1.0,   1.0, 0.0, 0.0,
+
+          // Bottom
+          -1.0, -1.0, 1.0,   0.0, 1.0, 1.0,
+          1.0, -1.0, 1.0,   0.0, 1.0, 1.0,
+          0.0, -1.0, -0.75, 0.0, 1.0, 1.0,
+        ];
+
+      let boxIndices =
+        [
+          // Front
+          0, 1, 2,
+          // Front Left
+          3, 4, 5,
+          // Back
+          6, 7, 8,
+          // Bottom
+          9,10, 11
+        ];
+
+      // make initialization
+      this.tetrahedronPositionBuffer = gl.createBuffer();
+      // В переменной ARRAY_BUFFER находится this.state.tetrahedronPositionBuffer
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.tetrahedronPositionBuffer);
+      // В ARRAY_BUFFER передаем tetrahedronVertices и флаг, что структура не будет меняться
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(tetrahedronVertices), gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+      this.tetrahedronPositionIndecies = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.tetrahedronPositionIndecies);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(boxIndices), gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    }
+
+    return {
+      vertices: this.tetrahedronPositionBuffer,
+      indices: this.tetrahedronPositionIndecies
+    }
+  }
+
+  drawTetrahedron(shaderProgram) {
+    const {gl} = this;
+
+    gl.useProgram(shaderProgram);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.frontFace(gl.CW);
+    gl.cullFace(gl.BACK);
+
+    const { vertices: positionBuffer, indices: idxBuffer } = this.getTetrahedronPositionBuffer();
+
+    const positionAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_position');
+    console.assert(positionAttributeLocation !== -1);
+
+    gl.enableVertexAttribArray(positionAttributeLocation);
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuffer);
+
+    // Для вершинного shader'a
+    // Указываем атрибуту positionAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
+    let size = 3;             // 3 компоненты на итерацию (x, y, z)
+    const type = gl.FLOAT;    // наши данные - 32-битные числа с плавающей точкой
+    const normalize = false;  // не нормализовать данные (не приводить в диапазон от 0 до 1)
+    const stride = 6 * 4;     // на каждую вершину храним 6 компонент, размер gl.FLOAT - 4 байта
+    let offset = 0;           // начинать с начала буфера
+
+    // Для атрибута позиции необходимо использовать следуюшие данные
+    gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
+
+    // Для атрибута текстурных координат необходимо использовать следуюшие данные
+    const texCoordAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_texCoord');
+    console.assert(texCoordAttributeLocation !== -1);
+    gl.enableVertexAttribArray(texCoordAttributeLocation);
+    // Для атрибута текстурных координат texCoordAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
+    // пропускаем первые 3 элемента, размер gl.FLOAT - 4 байта
+    offset = 3 * 4;
+    size = 3;
+    gl.vertexAttribPointer(texCoordAttributeLocation, size, type, normalize, stride, offset);
+
+    // Для отправки на отрисовку
+    const count = 3 * 4; // количество вершин
+
+    gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, 0);
+
+    gl.disable(gl.DEPTH_TEST); // todo restore state
+    gl.disable(gl.CULL_FACE);
+  }
+
+  //getSubdividedFace(start, dirRight, dirBottom, step, count) {
+  //
+  //  for (let i = 0; i <= count; i++) {
+  //    let current = Vec3.create();
+  //    for (let j = 0; j <= count; i++) {
+  //      current.add();
+  //    }
+  //  }
+  //}
+
+  getPlanetPositionBuffer() {
+    const { gl } = this;
+    const planetVertices =
+      [ // X, Y, Z           R, G, B
+        // Top
+        -1.0, 1.0, -1.0,   0.2, 0.7, 0.9,
+        -1.0, 1.0, 1.0,    0.2, 0.7, 0.9,
+        1.0, 1.0, 1.0,     0.2, 0.7, 0.9,
+        1.0, 1.0, -1.0,    0.2, 0.7, 0.9,
+
+        // Left
+        -1.0, 1.0, 1.0,    0.75, 0.25, 0.4,
+        -1.0, -1.0, 1.0,   0.75, 0.25, 0.4,
+        -1.0, -1.0, -1.0,  0.75, 0.25, 0.4,
+        -1.0, 1.0, -1.0,   0.75, 0.25, 0.4,
+
+        // Right
+        1.0, 1.0, 1.0,    0.25, 0.25, 0.8,
+        1.0, -1.0, 1.0,   0.25, 0.25, 0.8,
+        1.0, -1.0, -1.0,  0.25, 0.25, 0.8,
+        1.0, 1.0, -1.0,   0.25, 0.25, 0.8,
+
+        // Front
+        1.0, 1.0, 1.0,    1.0, 0.0, 0.2,
+        1.0, -1.0, 1.0,    1.0, 0.0, 0.2,
+        -1.0, -1.0, 1.0,    1.0, 0.0, 0.2,
+        -1.0, 1.0, 1.0,    1.0, 0.0, 0.2,
+
+        // Back
+        1.0, 1.0, -1.0,    0.0, 1.0, 0.2,
+        1.0, -1.0, -1.0,    0.0, 1.0, 0.2,
+        -1.0, -1.0, -1.0,    0.0, 1.0, 0.2,
+        -1.0, 1.0, -1.0,    0.0, 1.0, 0.2,
+
+        // Bottom
+        -1.0, -1.0, -1.0,   0.5, 0.5, 1.0,
+        -1.0, -1.0, 1.0,    0.5, 0.5, 1.0,
+        1.0, -1.0, 1.0,     0.5, 0.5, 1.0,
+        1.0, -1.0, -1.0,    0.5, 0.5, 1.0,
+      ];
+
+    const boxIndices =
+      [
+        // Top
+        0, 1, 2,
+        0, 2, 3,
+
+        // Left
+        5, 4, 6,
+        6, 4, 7,
+
+        // Right
+        8, 9, 10,
+        8, 10, 11,
+
+        // Front
+        13, 12, 14,
+        15, 14, 12,
+
+        // Back
+        16, 17, 18,
+        16, 18, 19,
+
+        // Bottom
+        21, 20, 22,
+        22, 20, 23
+      ];
+
+    if (!this.planetPositionBuffer) {
+      // make initialization
+      this.planetPositionBuffer = gl.createBuffer();
+      // В переменной ARRAY_BUFFER находится this.state.planetPositionBuffer
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.planetPositionBuffer);
+      // В ARRAY_BUFFER передаем planetVertices и флаг, что структура не будет меняться
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(planetVertices), gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+      this.planetPositionIndecies = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.planetPositionIndecies);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(boxIndices), gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    }
+
+    return {
+      vertices: this.planetPositionBuffer,
+      indices: this.planetPositionIndecies,
+      indicesCount: boxIndices.length
+    }
+  }
+
+  drawPlanet(shaderProgram) {
+    const { gl } = this;
+
+    gl.useProgram(shaderProgram);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.frontFace(gl.CW);
+    gl.cullFace(gl.BACK);
+
+    const { vertices: positionBuffer, indices: idxBuffer, indicesCount: count } = this.getPlanetPositionBuffer();
+
+    const positionAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_position');
+    console.assert(positionAttributeLocation !== -1);
+
+    gl.enableVertexAttribArray(positionAttributeLocation);
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuffer);
+
+    // Для вершинного shader'a
+    // Указываем атрибуту positionAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
+    let size = 3;           // 3 компоненты на итерацию (x, y, z)
+    const type = gl.FLOAT;    // наши данные - 32-битные числа с плавающей точкой
+    const normalize = false;  // не нормализовать данные (не приводить в диапазон от 0 до 1)
+    const stride = 6 * 4;     // на каждую вершину храним 5 компонент, размер gl.FLOAT - 4 байта
+    let offset = 0;           // начинать с начала буфера
+
+    // Для атрибута позиции необходимо использовать следуюшие данные
+    gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
+
+    // Для атрибута текстурных координат необходимо использовать следуюшие данные
+    const texCoordAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_texCoord');
+    console.assert(texCoordAttributeLocation !== -1);
+    gl.enableVertexAttribArray(texCoordAttributeLocation);
+    // Для атрибута текстурных координат texCoordAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
+    // пропускаем первые 3 элемента, размер gl.FLOAT - 4 байта
+    offset = 3 * 4;
+    size = 3;
+    gl.vertexAttribPointer(texCoordAttributeLocation, size, type, normalize, stride, offset);
+
+    // count - количество вершин для отправки на отрисовку
     gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, 0);
 
     gl.disable(gl.DEPTH_TEST); // todo restore state
