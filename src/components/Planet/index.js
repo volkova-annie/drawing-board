@@ -6,6 +6,7 @@ import {
   planetFragmentShaderSource
 } from '../../render/shaders';
 import * as math from 'mathjs';
+import styles from './styles.css';
 
 class Planet extends Component {
   constructor(props) {
@@ -17,7 +18,7 @@ class Planet extends Component {
 
     this.state = {
       render: null,
-      canvasWidth: 512,
+      canvasWidth: 1024,
       canvasHeight: 512,
       gl: null,
       planetShaderProgram: null
@@ -175,8 +176,98 @@ class Planet extends Component {
     const { canvasWidth, canvasHeight } = this.state;
 
     return (
-      <section>
-        <h1>Planet</h1>
+      <section className={ styles.wrapper }>
+        <header className={ styles.header }>
+          <div className={ styles['column-header'] }>
+            <h3>Translate</h3>
+            <label htmlFor='translateX'>
+              <span className={styles.rangeCaption}>translateX:</span>
+              <input
+                id='translateX'
+                type='range'
+                min='0.1'
+                max='2'
+                step='0.1'
+                value={ this.state.translateX }
+                onChange={ this.handleTranslateX }
+              />
+              { (this.state.translateX * 100).toFixed() }
+            </label>
+
+            <label htmlFor='translateY'>
+              <span className={styles.rangeCaption}>translateY:</span>
+              <input
+                id='translateY'
+                type='range'
+                min='0.1'
+                max='2'
+                step='0.1'
+                value={ this.state.translateY }
+                onChange={ this.handleTranslateY }
+              />
+              { (this.state.translateY * 100).toFixed() }
+            </label>
+
+            <label htmlFor='translateZ'>
+              <span className={styles.rangeCaption}>translateZ:</span>
+              <input
+                id='translateZ'
+                type='range'
+                min='0.1'
+                max='2'
+                step='0.1'
+                value={ this.state.translateZ }
+                onChange={ this.handleTranslateZ }
+              />
+              { (this.state.translateZ * 100).toFixed() }
+            </label>
+          </div>
+
+          <div className={ styles['column-header'] }>
+            <h3>Angle</h3>
+            <label htmlFor='angleX'>
+              <span className={styles.rangeCaption}>angleX:</span>
+              <input
+                id='angleX'
+                type='range'
+                min='0.1'
+                max='2'
+                step='0.1'
+                value={ this.state.angleX }
+                onChange={ this.handleAngleX }
+              />
+              { (this.state.angleX * 100).toFixed() }
+            </label>
+
+            <label htmlFor='angleY'>
+              <span className={styles.rangeCaption}>angleY:</span>
+              <input
+                id='angleY'
+                type='range'
+                min='0.1'
+                max='2'
+                step='0.1'
+                value={ this.state.angleY }
+                onChange={ this.handleAngleY }
+              />
+              { (this.state.angleY * 100).toFixed() }
+            </label>
+
+            <label htmlFor='angleZ'>
+              <span className={styles.rangeCaption}>angleZ:</span>
+              <input
+                id='angleZ'
+                type='range'
+                min='0.1'
+                max='2'
+                step='0.1'
+                value={ this.state.angleZ }
+                onChange={ this.handleAngleZ }
+              />
+              { (this.state.angleZ * 100).toFixed() }
+            </label>
+          </div>
+        </header>
         <div>
           <canvas
             ref={ this.planet }

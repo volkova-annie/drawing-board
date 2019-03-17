@@ -8,7 +8,7 @@ import {
   defaultFragmentShaderSource,
   waterAnimationFragmentShaderSource
 } from '../../render/shaders';
-import reign_image from '../../images/rhein.jpg'
+import reign_image from '../../images/rhein.jpg';
 
 class DrawingPage extends Component {
   constructor(props) {

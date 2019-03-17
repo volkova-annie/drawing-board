@@ -1,5 +1,7 @@
 import Texture from './texture'
 import { defaultFragmentShaderSource, vertexShaderSource } from './shaders';
+import Vec3 from './vec3'
+import * as math from 'mathjs';
 
 export default class Render {
   constructor(gl, width, height) {
@@ -141,8 +143,8 @@ export default class Render {
         // pos   // uv
         -w, -h,  0,  1,
         -w,  h,  0,  0,
-         w, -h,  1,  1,
-         w,  h,  1,  0
+        w, -h,  1,  1,
+        w,  h,  1,  0
       ];
       // make initialization
       this.quadPositionBuffer = gl.createBuffer();
@@ -348,8 +350,8 @@ export default class Render {
         [ // X, Y, Z           R, G, B
           // Front
           -1.0, -1.0,  1.0,   0.0, 1.0, 0.0,
-           0.0,  0.75, 0.125, 0.0, 1.0, 0.0,
-           1.0, -1.0,  1.0,   0.0, 1.0, 0.0,
+          0.0,  0.75, 0.125, 0.0, 1.0, 0.0,
+          1.0, -1.0,  1.0,   0.0, 1.0, 0.0,
 
           // Front Left
           1.0, -1.0,  1.0,    1.0, 0.0, 1.0,
@@ -357,8 +359,8 @@ export default class Render {
           0.0, -1.0, -0.75,   1.0, 0.0, 1.0,
 
           // Back
-           0.0, -1.0, -0.75,   1.0, 0.0, 0.0,
-           0.0,  0.75, 0.125,   1.0, 0.0, 0.0,
+          0.0, -1.0, -0.75,   1.0, 0.0, 0.0,
+          0.0,  0.75, 0.125,   1.0, 0.0, 0.0,
           -1.0, -1.0,  1.0,   1.0, 0.0, 0.0,
 
           // Bottom
@@ -447,83 +449,109 @@ export default class Render {
     gl.disable(gl.CULL_FACE);
   }
 
-  //getSubdividedFace(start, dirRight, dirBottom, step, count) {
-  //
-  //  for (let i = 0; i <= count; i++) {
-  //    let current = Vec3.create();
-  //    for (let j = 0; j <= count; i++) {
-  //      current.add();
-  //    }
-  //  }
-  //}
+  getGrid(width, height, steps, meshStartIdx, transform) {
+    const vertices = [];
+    const idxs = [];
+    let numVertices = 0;
+
+    const stepX = width / steps;
+    const stepY = height / steps;
+
+    const sphereRadius = width * Math.sqrt(2) / 2;
+
+    for (let currentStepY = 0; currentStepY < steps; ++currentStepY) {
+      for (let currentStepX = 0; currentStepX < steps; ++currentStepX) {
+        const currX = stepX * currentStepX;
+        const currY = stepY * currentStepY;
+
+        const positionsXY = [
+          currX,          currY,
+          currX + stepX,  currY,
+          currX,          currY + stepY,
+          currX + stepX,  currY + stepY
+        ];
+
+        const color = [Math.random(), Math.random(), Math.random()];
+
+        for (let i = 0; i < positionsXY.length; i += 2) {
+          const transformedPosition = math.multiply(math.matrix([positionsXY[i], positionsXY[i + 1], 0.0, 1.0]), transform).toArray();
+
+          const normal = new Vec3(transformedPosition[0], transformedPosition[1], transformedPosition[2]).normalize();
+          const positionOnSphere = normal.scale(sphereRadius);
+          vertices.push.apply(
+            vertices,
+            [positionOnSphere.x, positionOnSphere.y, positionOnSphere.z]
+          );
+          vertices.push.apply(vertices, color);
+          numVertices++;
+        }
+
+        const startIdx = meshStartIdx + 4 * (currentStepX + currentStepY * steps);
+        idxs.push(startIdx, startIdx + 1, startIdx + 2, startIdx + 2, startIdx + 1, startIdx + 3);
+      }
+    }
+
+    return {
+      vertices,
+      indices: idxs,
+      maxIdx: meshStartIdx + numVertices
+    }
+  }
 
   getPlanetPositionBuffer() {
     const { gl } = this;
-    const planetVertices =
-      [ // X, Y, Z           R, G, B
-        // Top
-        -1.0, 1.0, -1.0,   0.2, 0.7, 0.9,
-        -1.0, 1.0, 1.0,    0.2, 0.7, 0.9,
-        1.0, 1.0, 1.0,     0.2, 0.7, 0.9,
-        1.0, 1.0, -1.0,    0.2, 0.7, 0.9,
 
-        // Left
-        -1.0, 1.0, 1.0,    0.75, 0.25, 0.4,
-        -1.0, -1.0, 1.0,   0.75, 0.25, 0.4,
-        -1.0, -1.0, -1.0,  0.75, 0.25, 0.4,
-        -1.0, 1.0, -1.0,   0.75, 0.25, 0.4,
+    const planetVertices = [];
+    const boxIndices = [];
 
-        // Right
-        1.0, 1.0, 1.0,    0.25, 0.25, 0.8,
-        1.0, -1.0, 1.0,   0.25, 0.25, 0.8,
-        1.0, -1.0, -1.0,  0.25, 0.25, 0.8,
-        1.0, 1.0, -1.0,   0.25, 0.25, 0.8,
+    const transforms = [ //angleY, angleX
+      [0, 0],
+      [90, 0],
+      [180, 0],
+      [270, 0],
+      [0, 90],
+      [0, -90]
+    ];
 
-        // Front
-        1.0, 1.0, 1.0,    1.0, 0.0, 0.2,
-        1.0, -1.0, 1.0,    1.0, 0.0, 0.2,
-        -1.0, -1.0, 1.0,    1.0, 0.0, 0.2,
-        -1.0, 1.0, 1.0,    1.0, 0.0, 0.2,
+    const width = 2;
+    const height = 2;
+    const translate = math.matrix([
+      [1, 0, 0,  0],
+      [0, 1, 0,  0],
+      [0, 0, 1,  0],
+      [-0.5*width, -0.5*height, 0.5 * width,  1]
+    ]);
 
-        // Back
-        1.0, 1.0, -1.0,    0.0, 1.0, 0.2,
-        1.0, -1.0, -1.0,    0.0, 1.0, 0.2,
-        -1.0, -1.0, -1.0,    0.0, 1.0, 0.2,
-        -1.0, 1.0, -1.0,    0.0, 1.0, 0.2,
+    let startIdx = 0;
+    for (let i = 0; i < transforms.length; i++) {
+      const angleY = transforms[i][0] * Math.PI / 180;
+      c = math.cos(angleY);
+      s = math.sin(angleY);
+      const rotateAroundY = math.matrix([
+        [ c,  0, -s, 0],
+        [ 0,  1,  0, 0],
+        [ s,  0,  c, 0],
+        [ 0,  0,  0, 1]
+      ]);
 
-        // Bottom
-        -1.0, -1.0, -1.0,   0.5, 0.5, 1.0,
-        -1.0, -1.0, 1.0,    0.5, 0.5, 1.0,
-        1.0, -1.0, 1.0,     0.5, 0.5, 1.0,
-        1.0, -1.0, -1.0,    0.5, 0.5, 1.0,
-      ];
+      const angle = transforms[i][1] * Math.PI / 180;
+      let s = math.sin(angle);
+      let c = math.cos(angle);
+      const rotateAroundX = math.matrix([
+        [1,  0,  0,  0],
+        [0,  c,  s,  0],
+        [0, -s,  c,  0],
+        [0,  0,  0,  1]
+      ]);
 
-    const boxIndices =
-      [
-        // Top
-        0, 1, 2,
-        0, 2, 3,
+      const transform  = math.multiply(translate, rotateAroundY, rotateAroundX);
 
-        // Left
-        5, 4, 6,
-        6, 4, 7,
+      const { vertices : faceVertices, indices: faceIndices, maxIdx: lastIdx } = this.getGrid(2, 2, 10, startIdx, transform);
 
-        // Right
-        8, 9, 10,
-        8, 10, 11,
-
-        // Front
-        13, 12, 14,
-        15, 14, 12,
-
-        // Back
-        16, 17, 18,
-        16, 18, 19,
-
-        // Bottom
-        21, 20, 22,
-        22, 20, 23
-      ];
+      planetVertices.push.apply(planetVertices, faceVertices);
+      boxIndices.push.apply(boxIndices, faceIndices);
+      startIdx = lastIdx;
+    }
 
     if (!this.planetPositionBuffer) {
       // make initialization
@@ -555,6 +583,7 @@ export default class Render {
     gl.enable(gl.DEPTH_TEST);
     gl.frontFace(gl.CW);
     gl.cullFace(gl.BACK);
+    //gl.enable(gl.CULL_FACE);
 
     const { vertices: positionBuffer, indices: idxBuffer, indicesCount: count } = this.getPlanetPositionBuffer();
 

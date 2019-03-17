@@ -55,23 +55,23 @@ Vec3.prototype.scale = function(f) {
 };
 
 Vec3.prototype.distance = function(v) {
-  var dx = v.x - this.x;
-  var dy = v.y - this.y;
-  var dz = v.z - this.z;
+  const dx = v.x - this.x;
+  const dy = v.y - this.y;
+  const dz = v.z - this.z;
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 };
 
 Vec3.prototype.squareDistance = function(v) {
-  var dx = v.x - this.x;
-  var dy = v.y - this.y;
-  var dz = v.z - this.z;
+  const dx = v.x - this.x;
+  const dy = v.y - this.y;
+  const dz = v.z - this.z;
   return dx * dx + dy * dy + dz * dz;
 };
 
 Vec3.prototype.simpleDistance = function(v) {
-  var dx = Math.abs(v.x - this.x);
-  var dy = Math.abs(v.y - this.y);
-  var dz = Math.abs(v.z - this.z);
+  const dx = Math.abs(v.x - this.x);
+  const dy = Math.abs(v.y - this.y);
+  const dz = Math.abs(v.z - this.z);
   return Math.min(dx, dy, dz);
 };
 
@@ -95,12 +95,12 @@ Vec3.prototype.dot = function(b) {
 };
 
 Vec3.prototype.cross = function(v) {
-  var x = this.x;
-  var y = this.y;
-  var z = this.z;
-  var vx = v.x;
-  var vy = v.y;
-  var vz = v.z;
+  const x = this.x;
+  const y = this.y;
+  const z = this.z;
+  const vx = v.x;
+  const vy = v.y;
+  const vz = v.z;
   this.x = y * vz - z * vy;
   this.y = z * vx - x * vz;
   this.z = x * vy - y * vx;
@@ -141,7 +141,7 @@ Vec3.prototype.lengthSquared = function() {
 };
 
 Vec3.prototype.normalize = function() {
-  var len = this.length();
+  const len = this.length();
   if (len > 0) {
     this.scale(1 / len);
   }
@@ -149,7 +149,7 @@ Vec3.prototype.normalize = function() {
 };
 
 Vec3.prototype.limit = function(s) {
-  var len = this.length();
+  const len = this.length();
 
   if (len > s && len > 0) {
     this.scale(s / len);
@@ -166,9 +166,9 @@ Vec3.prototype.lerp = function(v, t) {
 };
 
 Vec3.prototype.transformMat4 = function(m) {
-  var x = m.a14 + m.a11 * this.x + m.a12 * this.y + m.a13 * this.z;
-  var y = m.a24 + m.a21 * this.x + m.a22 * this.y + m.a23 * this.z;
-  var z = m.a34 + m.a31 * this.x + m.a32 * this.y + m.a33 * this.z;
+  const x = m.a14 + m.a11 * this.x + m.a12 * this.y + m.a13 * this.z;
+  const y = m.a24 + m.a21 * this.x + m.a22 * this.y + m.a23 * this.z;
+  const z = m.a34 + m.a31 * this.x + m.a32 * this.y + m.a33 * this.z;
   this.x = x;
   this.y = y;
   this.z = z;
@@ -176,17 +176,17 @@ Vec3.prototype.transformMat4 = function(m) {
 };
 
 Vec3.prototype.transformQuat = function(q) {
-  var x = this.x;
-  var y = this.y;
-  var z = this.z;
-  var qx = q.x;
-  var qy = q.y;
-  var qz = q.z;
-  var qw = q.w;
-  var ix = qw * x + qy * z - qz * y;
-  var iy = qw * y + qz * x - qx * z;
-  var iz = qw * z + qx * y - qy * x;
-  var iw = -qx * x - qy * y - qz * z;
+  const x = this.x;
+  const y = this.y;
+  const z = this.z;
+  const qx = q.x;
+  const qy = q.y;
+  const qz = q.z;
+  const qw = q.w;
+  const ix = qw * x + qy * z - qz * y;
+  const iy = qw * y + qz * x - qx * z;
+  const iz = qw * z + qx * y - qy * x;
+  const iw = -qx * x - qy * y - qz * z;
   this.x = ix * qw + iw * -qx + iy * -qz - iz * -qy;
   this.y = iy * qw + iw * -qy + iz * -qx - ix * -qz;
   this.z = iz * qw + iw * -qz + ix * -qy - iy * -qx;
