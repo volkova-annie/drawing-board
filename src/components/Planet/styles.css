@@ -9,17 +9,18 @@
 .header {
   display: flex;
   justify-content: space-around;
-  width: 80%;
+  width: 90%;
   margin-bottom: 15px;
 }
 
 .column-header {
   display: flex;
   flex-direction: column;
-  //width: 50%;
 }
 
 .column-header label {
   display: flex;
   margin-bottom: 5px;
 }
+
+.rangeCaption {}

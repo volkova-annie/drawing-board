@@ -13,6 +13,16 @@ class Planet extends Component {
     super(props);
 
     this.renderGL = this.renderGL.bind(this);
+    this.handleTranslateX = this.handleTranslateX.bind(this);
+    this.handleTranslateY = this.handleTranslateY.bind(this);
+    this.handleTranslateZ = this.handleTranslateZ.bind(this);
+    this.handleRotateX = this.handleRotateX.bind(this);
+    this.handleRotateY = this.handleRotateY.bind(this);
+    this.handleRotateZ = this.handleRotateZ.bind(this);
+    this.handleScale = this.handleScale.bind(this);
+    this.handleMouseDown = this.handleMouseDown.bind(this);
+    this.handleMouseMove = this.handleMouseMove.bind(this);
+    this.handleMouseUp = this.handleMouseUp.bind(this);
 
     this.planet = React.createRef();
 
@@ -21,7 +31,18 @@ class Planet extends Component {
       canvasWidth: 1024,
       canvasHeight: 512,
       gl: null,
-      planetShaderProgram: null
+      planetShaderProgram: null,
+      isTetrahedronShow: false,
+      isCubeShow: false,
+      translateX: 0,
+      translateY: 0,
+      translateZ: -0.5,
+      rotateX: 0,
+      rotateY: 0,
+      rotateZ: 0,
+      scale: 0.1,
+      touchStartPosition: null,
+      mousePressed: false
     }
   }
 
@@ -53,28 +74,33 @@ class Planet extends Component {
   }
 
   renderGL() {
-    const { gl, render, planetShaderProgram } = this.state;
+    const { gl, render, planetShaderProgram, isCubeShow, isTetrahedronShow,
+      translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale
+    } = this.state;
 
     render.beginFrame();
 
     const FRACTION = 10000;
     const currentTime = (new Date().getTime() % FRACTION) / FRACTION;
 
-    const modelTransform = this.getTransform(0.1, currentTime * 360, currentTime * 360, -0.3);
-
     gl.useProgram(planetShaderProgram);
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_projection'), false, this.getPerspectiveMatrix());
-    gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelTransform);
 
-    render.drawCube(planetShaderProgram);
+    if (isCubeShow) {
+      const modelTransform = this.getTransform({ translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale });
+      gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelTransform);
+      render.drawCube(planetShaderProgram);
+    }
 
-    const modelTetraTransform = this.getTransform(0.1, 45, currentTime * 360, 0.1);
-    gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelTetraTransform);
-    render.drawTetrahedron(planetShaderProgram);
+    if (isTetrahedronShow) {
+      const modelTetraTransform = this.getTransform({ translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale });
+      gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelTetraTransform);
+      render.drawTetrahedron(planetShaderProgram);
+    }
 
-    const modelPlanetTransform = this.getTransform(0.1, currentTime * 360, currentTime * 360, 0.5);
+    const modelPlanetTransform = this.getTransform({ translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale });
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelPlanetTransform);
-    render.drawPlanet(planetShaderProgram)
+    render.drawPlanet(planetShaderProgram);
 
     const transform = this.getTransform3x3();
     render.endFrame(transform); // todo: move to Render
@@ -110,46 +136,70 @@ class Planet extends Component {
     return result;
   }
 
-  getTransform(scale = 1, rotateZ = 0, rotateY = 0, translateX = 0) {
+  getTransform(transformParams) {
+    const params = {
+      scale: 1,
+      rotateX: 0,
+      rotateY: 0,
+      rotateZ: 0,
+      translateX: 0,
+      translateY: 0,
+      translateZ: 0,
+      ...transformParams
+    };
+
+    const {
+      scale, rotateX, rotateY, rotateZ, translateX, translateY, translateZ,
+    } = params;
     let matrix = math.identity(4);
-    const scaleXY = math.matrix([
-      [scale, 0,     0,  0],
-      [0,     scale, 0,  0],
-      [0,     0,     scale,  0],
-      [0,     0,     0,  1]
+    
+    const scaleMat = math.matrix([
+      [scale, 0,     0,     0],
+      [0,     scale, 0,     0],
+      [0,     0,     scale, 0],
+      [0,     0,     0,     1]
     ]);
 
-    const translate = math.matrix([
-      [1, 0, 0,  0],
-      [0, 1, 0,  0],
-      [0, 0, 1,  0],
-      [translateX, 0.0, -0.8,  1]
+    const translateMat = math.matrix([
+      [1,           0,          0,          0],
+      [0,           1,          0,          0],
+      [0,           0,          1,          0],
+      [translateX,  translateY, translateZ, 1]
     ]);
 
-    const angle = rotateZ * Math.PI / 180;
-    let s = math.sin(angle);
-    let c = math.cos(angle);
-    const rotateAroundZ = math.matrix([
-      [c, s, 0, 0],
-      [-s,  c, 0, 0],
-      [0,  0, 1, 0],
-      [0,  0, 0, 1]
+    const rotateXRad = rotateX * Math.PI / 180;
+    let c = math.cos(rotateXRad);
+    let s = math.sin(rotateXRad);
+    const rotateAroundXMat = math.matrix([
+      [ 1,  0,  0, 0],
+      [ 0,  c,  s, 0],
+      [ 0, -s,  c, 0],
+      [ 0,  0,  0, 1]
     ]);
 
-    const angleY = rotateY * Math.PI / 180;
-    c = math.cos(angleY);
-    s = math.sin(angleY);
-    const rotateAroundY = math.matrix([
+    const rotateYRad = rotateY * Math.PI / 180;
+    c = math.cos(rotateYRad);
+    s = math.sin(rotateYRad);
+    const rotateAroundYMat = math.matrix([
       [ c,  0, -s, 0],
       [ 0,  1,  0, 0],
       [ s,  0,  c, 0],
       [ 0,  0,  0, 1]
     ]);
 
-    matrix = math.multiply(matrix, rotateAroundZ, rotateAroundY, scaleXY, translate);
+    const rotateZRad = rotateZ * Math.PI / 180;
+    s = math.sin(rotateZRad);
+    c = math.cos(rotateZRad);
+    const rotateAroundZMat = math.matrix([
+      [ c, s, 0, 0],
+      [-s, c, 0, 0],
+      [ 0, 0, 1, 0],
+      [ 0, 0, 0, 1]
+    ]);
 
-    const result = math.flatten(matrix).toArray();
-    return result;
+    matrix = math.multiply(matrix, rotateAroundXMat, rotateAroundYMat, rotateAroundZMat, scaleMat, translateMat);
+
+    return math.flatten(matrix).toArray();
   }
 
   getTransform3x3(scale = 1, rotateAngleDegree = 0) {
@@ -172,8 +222,67 @@ class Planet extends Component {
     return math.flatten(matrix).toArray();
   }
 
+  handleTranslateX(event) {
+    const { value } = event.target;
+    this.setState({ translateX: value });
+  }
+
+  handleTranslateY(event) {
+    const { value } = event.target;
+    this.setState({ translateY: value });
+  }
+
+  handleTranslateZ(event) {
+    const { value } = event.target;
+    this.setState({ translateZ: value });
+  }
+
+  handleRotateX(event) {
+    const { value } = event.target;
+    this.setState({ rotateX: value });
+  }
+
+  handleRotateY(event) {
+    const { value } = event.target;
+    this.setState({ rotateY: value });
+  }
+
+  handleRotateZ(event) {
+    const { value } = event.target;
+    this.setState({ rotateZ: value });
+  }
+
+  handleScale(event) {
+    const { value } = event.target;
+    this.setState({ scale: value });
+  }
+
+  handleMouseDown(event) {
+    const { clientX, clientY } = event;
+    this.setState({ mousePressed: true });
+  }
+
+  handleMouseMove(event) {
+    const { movementX, movementY } = event;
+    if ( this.state.mousePressed ){
+      this.setState((state) => {
+        return {
+          rotateX: state.rotateX - movementY,
+          rotateY: state.rotateY + movementX
+        }
+      });
+    }
+    //this.setState({ touchStartPosition: { clientX, clientY }, mousePressed: true });
+  }
+
+  handleMouseUp(event) {
+    this.setState({ mousePressed: false });
+  }
+
     render() {
-    const { canvasWidth, canvasHeight } = this.state;
+    const {
+      canvasWidth, canvasHeight, translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale
+    } = this.state;
 
     return (
       <section className={ styles.wrapper }>
@@ -185,13 +294,13 @@ class Planet extends Component {
               <input
                 id='translateX'
                 type='range'
-                min='0.1'
-                max='2'
-                step='0.1'
-                value={ this.state.translateX }
+                min='-3'
+                max='3'
+                step='0.2'
+                value={ translateX }
                 onChange={ this.handleTranslateX }
               />
-              { (this.state.translateX * 100).toFixed() }
+              { translateX }
             </label>
 
             <label htmlFor='translateY'>
@@ -199,13 +308,13 @@ class Planet extends Component {
               <input
                 id='translateY'
                 type='range'
-                min='0.1'
-                max='2'
-                step='0.1'
-                value={ this.state.translateY }
+                min='-3'
+                max='3'
+                step='0.2'
+                value={ translateY }
                 onChange={ this.handleTranslateY }
               />
-              { (this.state.translateY * 100).toFixed() }
+              { translateY }
             </label>
 
             <label htmlFor='translateZ'>
@@ -213,58 +322,74 @@ class Planet extends Component {
               <input
                 id='translateZ'
                 type='range'
-                min='0.1'
-                max='2'
-                step='0.1'
-                value={ this.state.translateZ }
+                min='-10'
+                max='0'
+                step='0.2'
+                value={ translateZ }
                 onChange={ this.handleTranslateZ }
               />
-              { (this.state.translateZ * 100).toFixed() }
+              { translateZ }
             </label>
           </div>
 
           <div className={ styles['column-header'] }>
             <h3>Angle</h3>
-            <label htmlFor='angleX'>
-              <span className={styles.rangeCaption}>angleX:</span>
+            <label htmlFor='rotateX'>
+              <span className={styles.rangeCaption}>rotateX:</span>
               <input
-                id='angleX'
+                id='rotateX'
                 type='range'
-                min='0.1'
-                max='2'
-                step='0.1'
-                value={ this.state.angleX }
-                onChange={ this.handleAngleX }
+                min='0'
+                max='360'
+                step='1'
+                value={ rotateX }
+                onChange={ this.handleRotateX }
               />
-              { (this.state.angleX * 100).toFixed() }
+              { rotateX }
             </label>
 
-            <label htmlFor='angleY'>
-              <span className={styles.rangeCaption}>angleY:</span>
+            <label htmlFor='rotateY'>
+              <span className={styles.rangeCaption}>rotateY:</span>
               <input
-                id='angleY'
+                id='rotateY'
                 type='range'
-                min='0.1'
-                max='2'
-                step='0.1'
-                value={ this.state.angleY }
-                onChange={ this.handleAngleY }
+                min='0'
+                max='360'
+                step='1'
+                value={ rotateY }
+                onChange={ this.handleRotateY }
               />
-              { (this.state.angleY * 100).toFixed() }
+              { rotateY }
             </label>
 
-            <label htmlFor='angleZ'>
-              <span className={styles.rangeCaption}>angleZ:</span>
+            <label htmlFor='rotateZ'>
+              <span className={styles.rangeCaption}>rotateZ:</span>
               <input
-                id='angleZ'
+                id='rotateZ'
+                type='range'
+                min='0'
+                max='360'
+                step='1'
+                value={ rotateZ }
+                onChange={ this.handleRotateZ }
+              />
+              { rotateZ }
+            </label>
+          </div>
+          <div className={ styles['column-header'] }>
+            <h3>Scale</h3>
+            <label htmlFor='scale'>
+              <span className={styles.rangeCaption}>scale:</span>
+              <input
+                id='scale'
                 type='range'
                 min='0.1'
                 max='2'
-                step='0.1'
-                value={ this.state.angleZ }
-                onChange={ this.handleAngleZ }
+                step='0.2'
+                value={ scale }
+                onChange={ this.handleScale }
               />
-              { (this.state.angleZ * 100).toFixed() }
+              { scale }
             </label>
           </div>
         </header>
@@ -272,7 +397,11 @@ class Planet extends Component {
           <canvas
             ref={ this.planet }
             width={ canvasWidth }
-            height={ canvasHeight }/>
+            height={ canvasHeight }
+            onMouseDown={ this.handleMouseDown }
+            onMouseMove={ this.handleMouseMove }
+            onMouseUp={ this.handleMouseUp }
+          />
         </div>
       </section>
     )
