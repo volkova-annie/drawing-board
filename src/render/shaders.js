@@ -107,34 +107,66 @@ export const waterAnimationFragmentShaderSource = `
 
 export const vertexPlanetShaderSource = `
   // атрибут, который будет получать данные из буфера
-  attribute vec3 a_position;
+  // input from javascript
+  attribute vec3 a_position; 
   attribute vec3 a_texCoord;
+  attribute vec3 a_normal;
   
+  // output to fragment shader
   varying highp vec3 v_texCoord;
+  varying vec3 v_normal;
+  varying vec3 v_worldPos;
   
+  // const
   uniform mat4 u_transform;
   uniform mat4 u_projection;
   
   // все шейдеры имеют функцию main
   void main() {
+  
+    v_worldPos = (u_transform * vec4(a_position, 1.0)).xyz;
     vec4 transformedPosition = u_projection * u_transform * vec4(a_position, 1.0);
     
     // gl_Position - специальная переменная вершинного шейдера,
     // которая отвечает за установку положения
     gl_Position = transformedPosition; // vec4(transformedPosition, 1.0);
+    // mat4 invMVP = transpose(inverse(u_transform));
+    v_normal = normalize(mat3(u_transform) * a_normal);
     v_texCoord = a_texCoord;
   }`;
 
 export const planetFragmentShaderSource = `
   precision mediump float;
  
+  // input from vertex shader
   varying highp vec3 v_texCoord;
+  varying vec3 v_normal;
+  varying vec3 v_worldPos;
 
+  // const per program
   uniform sampler2D u_sampler;
 
   void main() {
     // vec2 loc = v_texCoord; // center pixel cooordinate
     // vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
     
-    gl_FragColor = vec4(v_texCoord, 1.0);
+    vec3 L = -normalize(vec3(0.3, 1.0, 0.4)); // todo: задавать в js, добавить контролы
+    
+    vec3 camPos = vec3(0.0, 0.0, 0.0);
+    vec3 V = normalize(v_worldPos - camPos);
+    vec3 N = v_normal;
+    
+    vec3 R = reflect(-L, N);
+    float specPower = pow(max(dot(R, V), 0.0), 8.0);
+    
+    vec3 color = v_texCoord;
+    float NoL = max(dot(v_normal, -L), 0.0);
+    
+    vec3 lightColor = vec3(1.0, 1.0, 0.5);
+    vec3 diffuse = NoL * color;
+    vec3 specular = specPower * lightColor;
+    vec3 ambient = color * 0.05;
+    vec3 resultLighting = diffuse + specular + ambient;
+    // gl_FragColor = vec4(v_texCoord, 1.0);
+    gl_FragColor = vec4(resultLighting, 1.0);
   }`;

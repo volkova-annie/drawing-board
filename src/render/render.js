@@ -473,16 +473,18 @@ export default class Render {
 
         const color = [Math.random(), Math.random(), Math.random()];
 
+        // fill per vertex data
         for (let i = 0; i < positionsXY.length; i += 2) {
           const transformedPosition = math.multiply(math.matrix([positionsXY[i], positionsXY[i + 1], 0.0, 1.0]), transform).toArray();
 
           const normal = new Vec3(transformedPosition[0], transformedPosition[1], transformedPosition[2]).normalize();
           const positionOnSphere = normal.scale(sphereRadius);
-          vertices.push.apply(
+          vertices.push.apply( // vertex position
             vertices,
             [positionOnSphere.x, positionOnSphere.y, positionOnSphere.z]
           );
-          vertices.push.apply(vertices, color);
+          vertices.push.apply(vertices, color); // vertex color
+          vertices.push.apply(vertices, [normal.x, normal.y, normal.z]); // vertex normal
           numVertices++;
         }
 
@@ -599,7 +601,7 @@ export default class Render {
     let size = 3;           // 3 компоненты на итерацию (x, y, z)
     const type = gl.FLOAT;    // наши данные - 32-битные числа с плавающей точкой
     const normalize = false;  // не нормализовать данные (не приводить в диапазон от 0 до 1)
-    const stride = 6 * 4;     // на каждую вершину храним 5 компонент, размер gl.FLOAT - 4 байта
+    const stride = 9 * 4;     // на каждую вершину храним 9 компонент, размер gl.FLOAT - 4 байта [position.xyz, color.xyz, normal.xyz]
     let offset = 0;           // начинать с начала буфера
 
     // Для атрибута позиции необходимо использовать следуюшие данные
@@ -614,6 +616,12 @@ export default class Render {
     offset = 3 * 4;
     size = 3;
     gl.vertexAttribPointer(texCoordAttributeLocation, size, type, normalize, stride, offset);
+
+    const normalAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_normal');
+    console.assert(normalAttributeLocation !== -1);
+    offset = 6 * 4; // position (3) + color(3) == 6
+    size = 3; // normal.xyz
+    gl.vertexAttribPointer(normalAttributeLocation, size, type, normalize, stride, offset);
 
     // count - количество вершин для отправки на отрисовку
     gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, 0);
