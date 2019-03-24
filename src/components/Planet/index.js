@@ -7,6 +7,7 @@ import {
 } from '../../render/shaders';
 import * as math from 'mathjs';
 import styles from './styles.css';
+//import reign_image from '../../images/rhein.jpg';
 
 class Planet extends Component {
   constructor(props) {
@@ -19,6 +20,9 @@ class Planet extends Component {
     this.handleRotateX = this.handleRotateX.bind(this);
     this.handleRotateY = this.handleRotateY.bind(this);
     this.handleRotateZ = this.handleRotateZ.bind(this);
+    this.handleLightX = this.handleLightX.bind(this);
+    this.handleLightY = this.handleLightY.bind(this);
+    this.handleLightZ = this.handleLightZ.bind(this);
     this.handleScale = this.handleScale.bind(this);
     this.handleMouseDown = this.handleMouseDown.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
@@ -40,9 +44,13 @@ class Planet extends Component {
       rotateX: 0,
       rotateY: 0,
       rotateZ: 0,
-      scale: 0.1,
+      lightX: 0.6,
+      lightY: 0.55,
+      lightZ: 0.35,
+      scale: 0.2,
       touchStartPosition: null,
-      mousePressed: false
+      mousePressed: false,
+      //planetSurface: null
     }
   }
 
@@ -69,13 +77,21 @@ class Planet extends Component {
       planetShaderProgram,
     });
 
+    //// load image
+    //const image = new Image();
+    //image.onload = () => {
+    //  this.setState({ planetSurface: render.createTexture(image) });
+    //};
+    //image.src = reign_image;
+
     // Вызов renderGL 100 кадров в секунду
     setInterval(this.renderGL, 100);
   }
 
   renderGL() {
     const { gl, render, planetShaderProgram, isCubeShow, isTetrahedronShow,
-      translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale
+      translateX, translateY, translateZ, rotateX, rotateY, rotateZ, lightX, lightY, lightZ, scale,
+      //planetSurface
     } = this.state;
 
     render.beginFrame();
@@ -100,6 +116,14 @@ class Planet extends Component {
 
     const modelPlanetTransform = this.getTransform({ translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale });
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelPlanetTransform);
+    gl.uniform3f(gl.getUniformLocation(planetShaderProgram, 'u_lightDir'), lightX, lightY, lightZ);
+
+    //if (planetSurface) {
+    //  gl.activeTexture(gl.TEXTURE0);
+    //  gl.bindTexture(gl.TEXTURE_2D, planetSurface.texture);
+    //  gl.uniform1i(gl.getUniformLocation(planetShaderProgram, 'u_sampler'), 0);
+    //}
+
     render.drawPlanet(planetShaderProgram);
 
     const transform = this.getTransform3x3();
@@ -252,6 +276,21 @@ class Planet extends Component {
     this.setState({ rotateZ: value });
   }
 
+  handleLightX(event) {
+    const { value } = event.target;
+    this.setState({ lightX: Number(value).toFixed(2) });
+  }
+
+  handleLightY(event) {
+    const { value } = event.target;
+    this.setState({ lightY: value });
+  }
+
+  handleLightZ(event) {
+    const { value } = event.target;
+    this.setState({ lightZ: value });
+  }
+
   handleScale(event) {
     const { value } = event.target;
     this.setState({ scale: value });
@@ -281,7 +320,8 @@ class Planet extends Component {
 
     render() {
     const {
-      canvasWidth, canvasHeight, translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale
+      canvasWidth, canvasHeight, translateX, translateY, translateZ, rotateX, rotateY, rotateZ,
+      lightX, lightY, lightZ, scale
     } = this.state;
 
     return (
@@ -376,6 +416,52 @@ class Planet extends Component {
               { rotateZ }
             </label>
           </div>
+
+          <div className={ styles['column-header'] }>
+            <h3>Light</h3>
+            <label htmlFor='lightX'>
+              <span className={styles.rangeCaption}>lightX:</span>
+              <input
+                id='lightX'
+                type='range'
+                min='-1'
+                max='1'
+                step='0.05'
+                value={ lightX }
+                onChange={ this.handleLightX }
+              />
+              { lightX }
+            </label>
+
+            <label htmlFor='lightY'>
+              <span className={styles.rangeCaption}>lightY:</span>
+              <input
+                id='lightY'
+                type='range'
+                min='-1'
+                max='1'
+                step='0.05'
+                value={ lightY }
+                onChange={ this.handleLightY }
+              />
+              { lightY }
+            </label>
+
+            <label htmlFor='lightZ'>
+              <span className={styles.rangeCaption}>lightZ:</span>
+              <input
+                id='lightZ'
+                type='range'
+                min='-1'
+                max='1'
+                step='0.05'
+                value={ lightZ }
+                onChange={ this.handleLightZ }
+              />
+              { lightZ }
+            </label>
+          </div>
+
           <div className={ styles['column-header'] }>
             <h3>Scale</h3>
             <label htmlFor='scale'>
@@ -384,8 +470,8 @@ class Planet extends Component {
                 id='scale'
                 type='range'
                 min='0.1'
-                max='2'
-                step='0.2'
+                max='1'
+                step='0.05'
                 value={ scale }
                 onChange={ this.handleScale }
               />

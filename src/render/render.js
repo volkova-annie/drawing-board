@@ -20,6 +20,7 @@ export default class Render {
     this.tetrahedronPositionIndecies = null;
     this.planetPositionBuffer = null;
     this.planetPositionIndecies = null;
+    this.planetIndices = [];
 
     const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const defaultFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, defaultFragmentShaderSource);
@@ -450,7 +451,7 @@ export default class Render {
   }
 
   getGrid(width, height, steps, meshStartIdx, transform) {
-    const vertices = [];
+    let vertices = [];
     const idxs = [];
     let numVertices = 0;
 
@@ -471,7 +472,8 @@ export default class Render {
           currX + stepX,  currY + stepY
         ];
 
-        const color = [Math.random(), Math.random(), Math.random()];
+        const color = [87/255, 51/255, 155/255];
+        //const color = [Math.random(), Math.random(), Math.random()];
 
         // fill per vertex data
         for (let i = 0; i < positionsXY.length; i += 2) {
@@ -479,11 +481,13 @@ export default class Render {
 
           const normal = new Vec3(transformedPosition[0], transformedPosition[1], transformedPosition[2]).normalize();
           const positionOnSphere = normal.scale(sphereRadius);
+          const texCoord = [positionsXY[i] / width, positionsXY[i + 1] / height];
           vertices.push.apply( // vertex position
             vertices,
             [positionOnSphere.x, positionOnSphere.y, positionOnSphere.z]
           );
           vertices.push.apply(vertices, color); // vertex color
+          vertices.push.apply(vertices, texCoord);
           vertices.push.apply(vertices, [normal.x, normal.y, normal.z]); // vertex normal
           numVertices++;
         }
@@ -503,59 +507,59 @@ export default class Render {
   getPlanetPositionBuffer() {
     const { gl } = this;
 
-    const planetVertices = [];
-    const boxIndices = [];
-
-    const transforms = [ //angleY, angleX
-      [0, 0],
-      [90, 0],
-      [180, 0],
-      [270, 0],
-      [0, 90],
-      [0, -90]
-    ];
-
-    const width = 2;
-    const height = 2;
-    const translate = math.matrix([
-      [1, 0, 0,  0],
-      [0, 1, 0,  0],
-      [0, 0, 1,  0],
-      [-0.5*width, -0.5*height, 0.5 * width,  1]
-    ]);
-
-    let startIdx = 0;
-    for (let i = 0; i < transforms.length; i++) {
-      const angleY = transforms[i][0] * Math.PI / 180;
-      c = math.cos(angleY);
-      s = math.sin(angleY);
-      const rotateAroundY = math.matrix([
-        [ c,  0, -s, 0],
-        [ 0,  1,  0, 0],
-        [ s,  0,  c, 0],
-        [ 0,  0,  0, 1]
-      ]);
-
-      const angle = transforms[i][1] * Math.PI / 180;
-      let s = math.sin(angle);
-      let c = math.cos(angle);
-      const rotateAroundX = math.matrix([
-        [1,  0,  0,  0],
-        [0,  c,  s,  0],
-        [0, -s,  c,  0],
-        [0,  0,  0,  1]
-      ]);
-
-      const transform  = math.multiply(translate, rotateAroundY, rotateAroundX);
-
-      const { vertices : faceVertices, indices: faceIndices, maxIdx: lastIdx } = this.getGrid(2, 2, 10, startIdx, transform);
-
-      planetVertices.push.apply(planetVertices, faceVertices);
-      boxIndices.push.apply(boxIndices, faceIndices);
-      startIdx = lastIdx;
-    }
-
     if (!this.planetPositionBuffer) {
+      const planetVertices = [];
+      const boxIndices = [];
+
+      const transforms = [ //angleY, angleX
+        [0, 0],
+        [90, 0],
+        [180, 0],
+        [270, 0],
+        [0, 90],
+        [0, -90]
+      ];
+
+      const width = 2;
+      const height = 2;
+      const translate = math.matrix([
+        [1, 0, 0,  0],
+        [0, 1, 0,  0],
+        [0, 0, 1,  0],
+        [-0.5*width, -0.5*height, 0.5 * width,  1]
+      ]);
+
+      let startIdx = 0;
+      for (let i = 0; i < transforms.length; i++) {
+        const angleY = transforms[i][0] * Math.PI / 180;
+        c = math.cos(angleY);
+        s = math.sin(angleY);
+        const rotateAroundY = math.matrix([
+          [ c,  0, -s, 0],
+          [ 0,  1,  0, 0],
+          [ s,  0,  c, 0],
+          [ 0,  0,  0, 1]
+        ]);
+
+        const angle = transforms[i][1] * Math.PI / 180;
+        let s = math.sin(angle);
+        let c = math.cos(angle);
+        const rotateAroundX = math.matrix([
+          [1,  0,  0,  0],
+          [0,  c,  s,  0],
+          [0, -s,  c,  0],
+          [0,  0,  0,  1]
+        ]);
+
+        const transform  = math.multiply(translate, rotateAroundY, rotateAroundX);
+
+        const { vertices : faceVertices, indices: faceIndices, maxIdx: lastIdx } = this.getGrid(2, 2, 50, startIdx, transform);
+
+        planetVertices.push.apply(planetVertices, faceVertices);
+        boxIndices.push.apply(boxIndices, faceIndices);
+        startIdx = lastIdx;
+      }
+
       // make initialization
       this.planetPositionBuffer = gl.createBuffer();
       // В переменной ARRAY_BUFFER находится this.state.planetPositionBuffer
@@ -568,12 +572,13 @@ export default class Render {
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.planetPositionIndecies);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(boxIndices), gl.STATIC_DRAW);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+      this.planetIndices = boxIndices;
     }
 
     return {
       vertices: this.planetPositionBuffer,
       indices: this.planetPositionIndecies,
-      indicesCount: boxIndices.length
+      indicesCount: this.planetIndices.length
     }
   }
 
@@ -601,25 +606,35 @@ export default class Render {
     let size = 3;           // 3 компоненты на итерацию (x, y, z)
     const type = gl.FLOAT;    // наши данные - 32-битные числа с плавающей точкой
     const normalize = false;  // не нормализовать данные (не приводить в диапазон от 0 до 1)
-    const stride = 9 * 4;     // на каждую вершину храним 9 компонент, размер gl.FLOAT - 4 байта [position.xyz, color.xyz, normal.xyz]
+    const stride = 11 * 4;     // на каждую вершину храним 9 компонент, размер gl.FLOAT - 4 байта [position.xyz, color.xyz, texCoord.xy, normal.xyz]
     let offset = 0;           // начинать с начала буфера
 
     // Для атрибута позиции необходимо использовать следуюшие данные
     gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
 
     // Для атрибута текстурных координат необходимо использовать следуюшие данные
+    const colorAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_color');
+    console.assert(colorAttributeLocation !== -1);
+    gl.enableVertexAttribArray(colorAttributeLocation);
+    // Для атрибута текстурных координат colorAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
+    // пропускаем первые 3 элемента, размер gl.FLOAT - 4 байта
+    offset = 3 * 4;
+    size = 3;
+    gl.vertexAttribPointer(colorAttributeLocation, size, type, normalize, stride, offset);
+
+    // Для атрибута текстурных координат необходимо использовать следуюшие данные
     const texCoordAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_texCoord');
     console.assert(texCoordAttributeLocation !== -1);
     gl.enableVertexAttribArray(texCoordAttributeLocation);
     // Для атрибута текстурных координат texCoordAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
-    // пропускаем первые 3 элемента, размер gl.FLOAT - 4 байта
-    offset = 3 * 4;
-    size = 3;
+    // пропускаем первые 6 элементов, размер gl.FLOAT - 4 байта
+    offset = 6 * 4;
+    size = 2;
     gl.vertexAttribPointer(texCoordAttributeLocation, size, type, normalize, stride, offset);
 
     const normalAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_normal');
     console.assert(normalAttributeLocation !== -1);
-    offset = 6 * 4; // position (3) + color(3) == 6
+    offset = 8 * 4; // position (3) + color(3) + texCoord(2) == 8
     size = 3; // normal.xyz
     gl.vertexAttribPointer(normalAttributeLocation, size, type, normalize, stride, offset);
 

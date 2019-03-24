@@ -109,64 +109,136 @@ export const vertexPlanetShaderSource = `
   // атрибут, который будет получать данные из буфера
   // input from javascript
   attribute vec3 a_position; 
-  attribute vec3 a_texCoord;
+  attribute vec3 a_color;
+  attribute vec2 a_texCoord;
   attribute vec3 a_normal;
   
   // output to fragment shader
-  varying highp vec3 v_texCoord;
+  varying highp vec3 v_color;
+  varying highp vec2 v_texCoord;
   varying vec3 v_normal;
   varying vec3 v_worldPos;
+  varying vec3 v_planetColor;
+  varying float v_height;
   
   // const
   uniform mat4 u_transform;
   uniform mat4 u_projection;
   
+  // https://www.shadertoy.com/view/Xd3GRf - формула для вычисления непрерывного simplex noise
+  lowp vec4 permute(in lowp vec4 x) {
+    return mod(x*x*34.+x,289.);
+  }
+  lowp float snoise(in mediump vec3 v) {
+    const lowp vec2 C = vec2(0.16666666666,0.33333333333);
+    const lowp vec4 D = vec4(0,.5,1,2);
+    lowp vec3 i  = floor(C.y*(v.x+v.y+v.z) + v);
+    lowp vec3 x0 = C.x*(i.x+i.y+i.z) + (v - i);
+    lowp vec3 g = step(x0.yzx, x0);
+    lowp vec3 l = (1. - g).zxy;
+    lowp vec3 i1 = min( g, l );
+    lowp vec3 i2 = max( g, l );
+    lowp vec3 x1 = x0 - i1 + C.x;
+    lowp vec3 x2 = x0 - i2 + C.y;
+    lowp vec3 x3 = x0 - D.yyy;
+    i = mod(i,289.);
+    lowp vec4 p = permute( permute( permute(
+      i.z + vec4(0., i1.z, i2.z, 1.))
+      + i.y + vec4(0., i1.y, i2.y, 1.))
+      + i.x + vec4(0., i1.x, i2.x, 1.));
+    lowp vec3 ns = .142857142857 * D.wyz - D.xzx;
+    lowp vec4 j = -49. * floor(p * ns.z * ns.z) + p;
+    lowp vec4 x_ = floor(j * ns.z);
+    lowp vec4 x = x_ * ns.x + ns.yyyy;
+    lowp vec4 y = floor(j - 7. * x_ ) * ns.x + ns.yyyy;
+    lowp vec4 h = 1. - abs(x) - abs(y);
+    lowp vec4 b0 = vec4( x.xy, y.xy );
+    lowp vec4 b1 = vec4( x.zw, y.zw );
+    lowp vec4 sh = -step(h, vec4(0));
+    lowp vec4 a0 = b0.xzyw + (floor(b0)*2.+ 1.).xzyw*sh.xxyy;
+    lowp vec4 a1 = b1.xzyw + (floor(b1)*2.+ 1.).xzyw*sh.zzww;
+    lowp vec3 p0 = vec3(a0.xy,h.x);
+    lowp vec3 p1 = vec3(a0.zw,h.y);
+    lowp vec3 p2 = vec3(a1.xy,h.z);
+    lowp vec3 p3 = vec3(a1.zw,h.w);
+    lowp vec4 norm = inversesqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+    p0 *= norm.x;
+    p1 *= norm.y;
+    p2 *= norm.z;
+    p3 *= norm.w;
+    lowp vec4 m = max(.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.);
+    return .5 + 12. * dot( m * m * m, vec4( dot(p0,x0), dot(p1,x1),dot(p2,x2), dot(p3,x3) ) );
+  }
+  
   // все шейдеры имеют функцию main
   void main() {
-  
-    v_worldPos = (u_transform * vec4(a_position, 1.0)).xyz;
-    vec4 transformedPosition = u_projection * u_transform * vec4(a_position, 1.0);
+    vec4 worldPos = (u_transform * vec4(a_position, 1.0));
+    
+    // mat4 invMVP = transpose(inverse(u_transform));
+    v_normal = normalize(mat3(u_transform) * a_normal);
+    v_color = a_color;
+    
+    float noise = snoise(a_position * 1.0);
+    vec3 earthColor = vec3(92.0 / 255.0, 137.0 / 255.0, 30.0 / 255.0);
+    vec3 waterColor = vec3(21.0 / 255.0, 135.0 / 255.0, 259.0 / 255.0);
+    
+    float t = noise * noise;
+    if (noise < 0.7 && noise > 0.4) {
+      t = 0.7;
+    }
+    v_planetColor = mix(waterColor, earthColor, t);
+    if (t > 0.7) {
+      float height = (t - 0.7) / (1.0 - 0.7);
+      worldPos.xyz += v_normal * height * 0.006;
+    }
+    
+    v_texCoord = a_texCoord;
+    v_height = t;
     
     // gl_Position - специальная переменная вершинного шейдера,
     // которая отвечает за установку положения
+    v_worldPos = worldPos.xyz;
+    vec4 transformedPosition = u_projection * worldPos;
     gl_Position = transformedPosition; // vec4(transformedPosition, 1.0);
-    // mat4 invMVP = transpose(inverse(u_transform));
-    v_normal = normalize(mat3(u_transform) * a_normal);
-    v_texCoord = a_texCoord;
   }`;
 
 export const planetFragmentShaderSource = `
   precision mediump float;
  
   // input from vertex shader
-  varying highp vec3 v_texCoord;
+  varying highp vec3 v_color;
+  varying highp vec2 v_texCoord;
   varying vec3 v_normal;
+  varying vec3 v_planetColor;
   varying vec3 v_worldPos;
+  varying float v_height;
 
   // const per program
   uniform sampler2D u_sampler;
+  uniform vec3 u_lightDir;
 
   void main() {
-    // vec2 loc = v_texCoord; // center pixel cooordinate
-    // vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
+     //vec2 loc = v_texCoord; // center pixel cooordinate
+     //vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
     
-    vec3 L = -normalize(vec3(0.3, 1.0, 0.4)); // todo: задавать в js, добавить контролы
+    vec3 L = -normalize(u_lightDir);
     
     vec3 camPos = vec3(0.0, 0.0, 0.0);
     vec3 V = normalize(v_worldPos - camPos);
     vec3 N = v_normal;
     
     vec3 R = reflect(-L, N);
-    float specPower = pow(max(dot(R, V), 0.0), 8.0);
+    float specPower = pow(max(dot(R, V), 0.0), v_height > 0.5 ? 8.0 : 24.0);
     
-    vec3 color = v_texCoord;
+    vec3 color = v_planetColor;
     float NoL = max(dot(v_normal, -L), 0.0);
     
-    vec3 lightColor = vec3(1.0, 1.0, 0.5);
+    vec3 lightColor = vec3(1.0, 1.0, 0.5) * 0.7;
     vec3 diffuse = NoL * color;
     vec3 specular = specPower * lightColor;
-    vec3 ambient = color * 0.05;
+    vec3 ambient = color * 0.3;
     vec3 resultLighting = diffuse + specular + ambient;
-    // gl_FragColor = vec4(v_texCoord, 1.0);
     gl_FragColor = vec4(resultLighting, 1.0);
+    //gl_FragColor = vec4(v_texCoord, 0.0, 1.0);
+    //gl_FragColor = vec4(v_planetColor, 1.0);
   }`;

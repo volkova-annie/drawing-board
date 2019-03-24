@@ -74,9 +74,7 @@ class DrawingPage extends Component {
       // load image
       const image = new Image();
       image.onload = () => {
-        this.setState({ lennaImage: this.state.render.createTexture(image) });
-
-        this.setState({ isImageLoaded: true });
+        this.setState({ lennaImage: this.state.render.createTexture(image), isImageLoaded: true });
       };
       image.src = reign_image;
     });
