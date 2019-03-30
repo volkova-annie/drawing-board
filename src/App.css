@@ -1,10 +1,16 @@
+body {
+  background: rgb(4, 5, 45);
+}
+
 .App {
   text-align: center;
 }
+
 .tabs {
   display: flex;
   justify-content: center;
-  margin: 20px auto;
+  margin: 0 auto;
+  padding-top: 20px;
 }
 
 .tab-control {

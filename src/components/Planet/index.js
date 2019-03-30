@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import React from 'react';
+import ColorPicker from '../ColorPicker';
 import Render from '../../render/render'
 import {
   vertexPlanetShaderSource,
@@ -27,6 +28,10 @@ class Planet extends Component {
     this.handleMouseDown = this.handleMouseDown.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseUp = this.handleMouseUp.bind(this);
+    this.handleColorWater = this.handleColorWater.bind(this);
+    this.handleColorEarth = this.handleColorEarth.bind(this);
+    this.handleColorMountains = this.handleColorMountains.bind(this);
+    this.handleColorSnow = this.handleColorSnow.bind(this);
 
     this.planet = React.createRef();
 
@@ -50,7 +55,35 @@ class Planet extends Component {
       scale: 0.2,
       touchStartPosition: null,
       mousePressed: false,
-      //planetSurface: null
+      waterColor: {
+        r: '21.0',
+        g: '135.0',
+        b: '259.0',
+        a: 1
+      },
+      snowColor: {
+        r: '255.0',
+        g: '255.0',
+        b: '255.0',
+        a: 1
+      },
+      mountainsColor: {
+        r: '140.0',
+        g: '80.0',
+        b: '9.0',
+        a: 1
+      },
+      earthColor: {
+        r: '92.0',
+        g: '170.0',
+        b: '30.0',
+        a: 1
+      },
+      //waterColor: [255.0 / 255.0, g: 255.0 / 255.0, b: 255.0 / 255.0, a: 1],
+      //earthColor: {r: 140.0 / 255.0, g: 80.0 / 255.0, b: 9.0 / 255.0, a: 1},
+      //mountainsColor: {r: 92.0 / 255.0, g: 170.0 / 255.0, b: 30.0 / 255.0, a: 1}
+      //snowColor: {r: 21.0 / 255.0, g: 135.0 / 255.0, b: 259.0 / 255.0, a: 1}
+      //planetSurface: null,
     }
   }
 
@@ -91,6 +124,7 @@ class Planet extends Component {
   renderGL() {
     const { gl, render, planetShaderProgram, isCubeShow, isTetrahedronShow,
       translateX, translateY, translateZ, rotateX, rotateY, rotateZ, lightX, lightY, lightZ, scale,
+      snowColor, waterColor, earthColor, mountainsColor
       //planetSurface
     } = this.state;
 
@@ -117,6 +151,10 @@ class Planet extends Component {
     const modelPlanetTransform = this.getTransform({ translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale });
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelPlanetTransform);
     gl.uniform3f(gl.getUniformLocation(planetShaderProgram, 'u_lightDir'), lightX, lightY, lightZ);
+    gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_snowColor'), this.convertColor(snowColor));
+    gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_mountainsColor'), this.convertColor(mountainsColor));
+    gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_earthColor'), this.convertColor(earthColor));
+    gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_waterColor'), this.convertColor(waterColor));
 
     //if (planetSurface) {
     //  gl.activeTexture(gl.TEXTURE0);
@@ -128,6 +166,14 @@ class Planet extends Component {
 
     const transform = this.getTransform3x3();
     render.endFrame(transform); // todo: move to Render
+  }
+
+  convertColor(color) {
+    return [
+      color.r / 255.0,
+      color.g / 255.0,
+      color.b / 255.0
+    ]
   }
 
   getPerspectiveMatrix() {
@@ -268,6 +314,8 @@ class Planet extends Component {
 
   handleRotateY(event) {
     const { value } = event.target;
+    console.log(value);
+    console.log(this.state.rotateY);
     this.setState({ rotateY: value });
   }
 
@@ -278,7 +326,7 @@ class Planet extends Component {
 
   handleLightX(event) {
     const { value } = event.target;
-    this.setState({ lightX: Number(value).toFixed(2) });
+    this.setState({ lightX: value });
   }
 
   handleLightY(event) {
@@ -296,8 +344,8 @@ class Planet extends Component {
     this.setState({ scale: value });
   }
 
-  handleMouseDown(event) {
-    const { clientX, clientY } = event;
+  handleMouseDown() {
+    //const { clientX, clientY } = event;
     this.setState({ mousePressed: true });
   }
 
@@ -307,21 +355,38 @@ class Planet extends Component {
       this.setState((state) => {
         return {
           rotateX: state.rotateX - movementY,
-          rotateY: state.rotateY + movementX
+          rotateY: Number(state.rotateY) + movementX
         }
       });
     }
-    //this.setState({ touchStartPosition: { clientX, clientY }, mousePressed: true });
   }
 
-  handleMouseUp(event) {
+  handleMouseUp() {
     this.setState({ mousePressed: false });
   }
+
+  handleColorWater(waterColor) {
+    this.setState({ waterColor });
+  }
+
+  handleColorEarth(earthColor) {
+    this.setState({ earthColor });
+  }
+
+  handleColorMountains(mountainsColor) {
+    this.setState({ mountainsColor });
+  }
+
+  handleColorSnow(snowColor) {
+    this.setState({ snowColor });
+  }
+
 
     render() {
     const {
       canvasWidth, canvasHeight, translateX, translateY, translateZ, rotateX, rotateY, rotateZ,
-      lightX, lightY, lightZ, scale
+      lightX, lightY, lightZ, scale,
+      waterColor, earthColor, mountainsColor, snowColor
     } = this.state;
 
     return (
@@ -330,7 +395,7 @@ class Planet extends Component {
           <div className={ styles['column-header'] }>
             <h3>Translate</h3>
             <label htmlFor='translateX'>
-              <span className={styles.rangeCaption}>translateX:</span>
+              <span className={ styles.rangeCaption }>translateX:</span>
               <input
                 id='translateX'
                 type='range'
@@ -344,7 +409,7 @@ class Planet extends Component {
             </label>
 
             <label htmlFor='translateY'>
-              <span className={styles.rangeCaption}>translateY:</span>
+              <span className={ styles.rangeCaption }>translateY:</span>
               <input
                 id='translateY'
                 type='range'
@@ -358,7 +423,7 @@ class Planet extends Component {
             </label>
 
             <label htmlFor='translateZ'>
-              <span className={styles.rangeCaption}>translateZ:</span>
+              <span className={ styles.rangeCaption }>translateZ:</span>
               <input
                 id='translateZ'
                 type='range'
@@ -375,7 +440,7 @@ class Planet extends Component {
           <div className={ styles['column-header'] }>
             <h3>Angle</h3>
             <label htmlFor='rotateX'>
-              <span className={styles.rangeCaption}>rotateX:</span>
+              <span className={ styles.rangeCaption }>rotateX:</span>
               <input
                 id='rotateX'
                 type='range'
@@ -389,7 +454,7 @@ class Planet extends Component {
             </label>
 
             <label htmlFor='rotateY'>
-              <span className={styles.rangeCaption}>rotateY:</span>
+              <span className={ styles.rangeCaption }>rotateY:</span>
               <input
                 id='rotateY'
                 type='range'
@@ -403,7 +468,7 @@ class Planet extends Component {
             </label>
 
             <label htmlFor='rotateZ'>
-              <span className={styles.rangeCaption}>rotateZ:</span>
+              <span className={ styles.rangeCaption }>rotateZ:</span>
               <input
                 id='rotateZ'
                 type='range'
@@ -420,7 +485,7 @@ class Planet extends Component {
           <div className={ styles['column-header'] }>
             <h3>Light</h3>
             <label htmlFor='lightX'>
-              <span className={styles.rangeCaption}>lightX:</span>
+              <span className={ styles.rangeCaption }>lightX:</span>
               <input
                 id='lightX'
                 type='range'
@@ -434,7 +499,7 @@ class Planet extends Component {
             </label>
 
             <label htmlFor='lightY'>
-              <span className={styles.rangeCaption}>lightY:</span>
+              <span className={ styles.rangeCaption }>lightY:</span>
               <input
                 id='lightY'
                 type='range'
@@ -448,7 +513,7 @@ class Planet extends Component {
             </label>
 
             <label htmlFor='lightZ'>
-              <span className={styles.rangeCaption}>lightZ:</span>
+              <span className={ styles.rangeCaption }>lightZ:</span>
               <input
                 id='lightZ'
                 type='range'
@@ -465,7 +530,7 @@ class Planet extends Component {
           <div className={ styles['column-header'] }>
             <h3>Scale</h3>
             <label htmlFor='scale'>
-              <span className={styles.rangeCaption}>scale:</span>
+              <span className={ styles.rangeCaption } >scale:</span>
               <input
                 id='scale'
                 type='range'
@@ -489,6 +554,37 @@ class Planet extends Component {
             onMouseUp={ this.handleMouseUp }
           />
         </div>
+        <aside className={ styles.aside }>
+          <h3>Planet Colors</h3>
+          <label>
+            <span className={ styles.rangeCaption }>Water:</span>
+            <ColorPicker
+              color={ waterColor }
+              onChange={ this.handleColorWater }
+            />
+          </label>
+          <label>
+            <span className={ styles.rangeCaption }>Earth:</span>
+            <ColorPicker
+              color={ earthColor }
+              onChange={ this.handleColorEarth }
+            />
+          </label>
+          <label>
+            <span className={ styles.rangeCaption }>Mountains:</span>
+            <ColorPicker
+              color={ mountainsColor }
+              onChange={ this.handleColorMountains }
+            />
+          </label>
+          <label>
+            <span className={ styles.rangeCaption }>Snow:</span>
+            <ColorPicker
+              color={ snowColor }
+              onChange={ this.handleColorSnow }
+            />
+          </label>
+        </aside>
       </section>
     )
   }

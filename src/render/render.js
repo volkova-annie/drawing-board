@@ -62,7 +62,8 @@ export default class Render {
     this.pushRenderTarget(this._frontBuffer);
 
     // очищаем canvas
-    this.gl.clearColor(245 / 255, 232 / 255, 249 / 255, 1);
+    this.gl.clearColor(4 / 255, 5 / 255, 45 / 255, 1);
+    //this.gl.clearColor(245 / 255, 232 / 255, 249 / 255, 1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
   }
 

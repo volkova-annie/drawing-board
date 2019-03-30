@@ -8,6 +8,7 @@ import {
   defaultFragmentShaderSource,
   waterAnimationFragmentShaderSource
 } from '../../render/shaders';
+import styles from './styles.css';
 import reign_image from '../../images/rhein.jpg';
 
 class DrawingPage extends Component {
@@ -271,6 +272,7 @@ class DrawingPage extends Component {
     const { canvasWidth, canvasHeight } = this.state;
     return (
       <div>
+        <div className={styles.background}></div>
         <canvas
           ref={ this.canvas }
           width={ canvasWidth }

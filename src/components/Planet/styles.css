@@ -1,16 +1,24 @@
 .wrapper {
-  width: 1024px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   margin: 20px auto;
+  padding: 0 20px;
 }
 
-.header {
+.header, .aside {
   display: flex;
-  justify-content: space-around;
-  width: 90%;
+  flex-direction: column;
+  height: auto;
+  width: 240px;
   margin-bottom: 15px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.7px;
+  flex-shrink: 1;
+}
+
+.aside {
+  align-self: flex-start;
+  margin-top: 10px;
 }
 
 .column-header {
@@ -18,9 +26,17 @@
   flex-direction: column;
 }
 
-.column-header label {
+.column-header label, .aside label {
   display: flex;
   margin-bottom: 5px;
 }
 
-.rangeCaption {}
+.column-header input {
+  margin-right: 10px;
+  width: 100px;
+  opacity: 0.5;
+}
+
+.rangeCaption {
+  width: 90px;
+}

@@ -1,4 +1,9 @@
-.board {
-  background-color: aliceblue;
-  border: 2px solid gainsboro;
+.background {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #ffffff;
+  z-index: -1;
 }
