@@ -21,6 +21,7 @@ export default class Render {
     this.planetPositionBuffer = null;
     this.planetPositionIndecies = null;
     this.planetIndices = [];
+    this.bgPlanetColor = [4 / 255, 5 / 255, 45 / 255, 1];
 
     const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const defaultFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, defaultFragmentShaderSource);
@@ -62,8 +63,7 @@ export default class Render {
     this.pushRenderTarget(this._frontBuffer);
 
     // очищаем canvas
-    this.gl.clearColor(4 / 255, 5 / 255, 45 / 255, 1);
-    //this.gl.clearColor(245 / 255, 232 / 255, 249 / 255, 1);
+    this.gl.clearColor(this.bgPlanetColor[0], this.bgPlanetColor[1], this.bgPlanetColor[2], this.bgPlanetColor[3]);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
   }
 
@@ -452,7 +452,9 @@ export default class Render {
   }
 
   getGrid(width, height, steps, meshStartIdx, transform) {
-    let vertices = [];
+    const elementPerVertex = 11;
+    const numElements = steps * steps * 4 * elementPerVertex;
+    const vertices = new Array(numElements);
     const idxs = [];
     let numVertices = 0;
 
@@ -461,6 +463,7 @@ export default class Render {
 
     const sphereRadius = width * Math.sqrt(2) / 2;
 
+    let vertexElementIdx = 0;
     for (let currentStepY = 0; currentStepY < steps; ++currentStepY) {
       for (let currentStepX = 0; currentStepX < steps; ++currentStepX) {
         const currX = stepX * currentStepX;
@@ -483,13 +486,28 @@ export default class Render {
           const normal = new Vec3(transformedPosition[0], transformedPosition[1], transformedPosition[2]).normalize();
           const positionOnSphere = normal.scale(sphereRadius);
           const texCoord = [positionsXY[i] / width, positionsXY[i + 1] / height];
-          vertices.push.apply( // vertex position
-            vertices,
-            [positionOnSphere.x, positionOnSphere.y, positionOnSphere.z]
-          );
-          vertices.push.apply(vertices, color); // vertex color
-          vertices.push.apply(vertices, texCoord);
-          vertices.push.apply(vertices, [normal.x, normal.y, normal.z]); // vertex normal
+          vertices[vertexElementIdx++] = positionOnSphere.x;
+          vertices[vertexElementIdx++] = positionOnSphere.y;
+          vertices[vertexElementIdx++] = positionOnSphere.z;
+
+          vertices[vertexElementIdx++] = color[0];
+          vertices[vertexElementIdx++] = color[1];
+          vertices[vertexElementIdx++] = color[2];
+
+          vertices[vertexElementIdx++] = texCoord[0];
+          vertices[vertexElementIdx++] = texCoord[1];
+
+          vertices[vertexElementIdx++] = normal.x;
+          vertices[vertexElementIdx++] = normal.y;
+          vertices[vertexElementIdx++] = normal.z;
+
+          //vertices.push.apply( // vertex position
+          //  vertices,
+          //  [positionOnSphere.x, positionOnSphere.y, positionOnSphere.z]
+          //);
+          //vertices.push.apply(vertices, color); // vertex color
+          //vertices.push.apply(vertices, texCoord);
+          //vertices.push.apply(vertices, [normal.x, normal.y, normal.z]); // vertex normal
           numVertices++;
         }
 
@@ -509,8 +527,8 @@ export default class Render {
     const { gl } = this;
 
     if (!this.planetPositionBuffer) {
-      const planetVertices = [];
-      const boxIndices = [];
+      let planetVertices = [];
+      let boxIndices = [];
 
       const transforms = [ //angleY, angleX
         [0, 0],
@@ -556,8 +574,8 @@ export default class Render {
 
         const { vertices : faceVertices, indices: faceIndices, maxIdx: lastIdx } = this.getGrid(2, 2, 50, startIdx, transform);
 
-        planetVertices.push.apply(planetVertices, faceVertices);
-        boxIndices.push.apply(boxIndices, faceIndices);
+        planetVertices = [...planetVertices, ...faceVertices];
+        boxIndices = [...boxIndices, ...faceIndices];
         startIdx = lastIdx;
       }
 

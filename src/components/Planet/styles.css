@@ -5,20 +5,32 @@
   padding: 0 20px;
 }
 
+.background {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: -1;
+}
+
 .header, .aside {
   display: flex;
   flex-direction: column;
   height: auto;
-  width: 240px;
   margin-bottom: 15px;
   color: rgba(255, 255, 255, 0.5);
   letter-spacing: 0.7px;
-  flex-shrink: 1;
+}
+
+.header {
+  min-width: 245px;
 }
 
 .aside {
   align-self: flex-start;
   margin-top: 10px;
+  flex-shrink: 0.5;
 }
 
 .column-header {
@@ -31,7 +43,7 @@
   margin-bottom: 5px;
 }
 
-.column-header input {
+.column-header input, aside input {
   margin-right: 10px;
   width: 100px;
   opacity: 0.5;

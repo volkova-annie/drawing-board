@@ -125,6 +125,7 @@ export const vertexPlanetShaderSource = `
   // const
   uniform mat4 u_transform;
   uniform mat4 u_projection;
+  uniform mediump float u_waterLevel;
   
   // https://www.shadertoy.com/view/Xd3GRf - формула для вычисления непрерывного simplex noise
   lowp vec4 permute(in lowp vec4 x) {
@@ -181,10 +182,9 @@ export const vertexPlanetShaderSource = `
     
     float noise = (snoise(a_position * 1.0) + 0.5 * snoise(a_position * 2.0) + 0.25 * snoise(a_position * 4.0)) / 1.75;
     
-    float waterLevel = 0.55;
     float height = noise;
-    float heightAboveWater = max(height - waterLevel, 0.0);
-    float normalizedHeightAboveWater = heightAboveWater / (1.0 - waterLevel);
+    float heightAboveWater = max(height - u_waterLevel, 0.0);
+    float normalizedHeightAboveWater = heightAboveWater / (1.0 - u_waterLevel);
     if (heightAboveWater > 0.0) {
       float maxHeight = 0.02;
       worldPos.xyz += v_normal * normalizedHeightAboveWater * maxHeight;
@@ -219,6 +219,7 @@ export const planetFragmentShaderSource = `
   uniform vec3 u_mountainsColor;
   uniform vec3 u_earthColor;
   uniform vec3 u_waterColor;
+  uniform float u_waterLevel;
 
   // https://www.shadertoy.com/view/Xd3GRf - формула для вычисления непрерывного simplex noise
   lowp vec4 permute(in lowp vec4 x) {
@@ -288,7 +289,7 @@ export const planetFragmentShaderSource = `
     vec3 waterColor = u_waterColor;
     vec3 color = waterColor;
 
-    float waterLevel = 0.3;
+    float waterLevel = u_waterLevel;
     float snowLayer = 0.8 * (1.0 - abs(v_pos.y));
     float height = noise1;
     float heightAboveWater = max(height - waterLevel, 0.0);
@@ -303,7 +304,7 @@ export const planetFragmentShaderSource = `
     float specPower = 8.0;
     float specularStrength = 0.6; 
     color = waterColor;
-    if (v_height > 0.55) { // todo: uniform flot waterLevel 
+    if (v_height > u_waterLevel) {
       color = earthColor;
       float noiseMoisture = (snoise(v_pos * 4.0)) / 1.0;
 
@@ -331,6 +332,143 @@ export const planetFragmentShaderSource = `
     vec3 ambient = color * 0.3;
     vec3 resultLighting = diffuse + specular + ambient;
     gl_FragColor = vec4(resultLighting, 1.0);
+    //gl_FragColor = vec4(v_texCoord, 0.0, 1.0);
+    //gl_FragColor = vec4(v_planetColor, 1.0);
+  }`;
+
+export const cloudsVertexShaderSource = `
+  // атрибут, который будет получать данные из буфера
+  // input from javascript
+  attribute vec3 a_position;
+  attribute vec3 a_color;
+  attribute vec2 a_texCoord;
+  attribute vec3 a_normal;
+
+  // output to fragment shader
+  varying highp vec3 v_color;
+  varying highp vec2 v_texCoord;
+  varying vec3 v_normal;
+  varying vec3 v_worldPos;
+  varying vec3 v_pos;
+
+  // const
+  uniform mat4 u_transform;
+  uniform mat4 u_projection;
+
+  void main() {
+    vec4 worldPos = (u_transform * vec4(a_position, 1.0));
+
+    // mat4 invMVP = transpose(inverse(u_transform));
+    v_normal = normalize(mat3(u_transform) * a_normal);
+    v_color = a_color;
+
+    v_texCoord = a_texCoord;
+
+    v_pos = a_position;
+    // gl_Position - специальная переменная вершинного шейдера,
+    // которая отвечает за установку положения
+    v_worldPos = worldPos.xyz;
+    vec4 transformedPosition = u_projection * worldPos;
+    gl_Position = transformedPosition; // vec4(transformedPosition, 1.0);
+  }`;
+
+export const cloudsFragmentShaderSource = `
+  precision mediump float;
+
+  // input from vertex shader
+  varying highp vec3 v_color;
+  varying highp vec2 v_texCoord;
+  varying vec3 v_normal;
+  varying vec3 v_worldPos;
+  varying vec3 v_pos;
+
+  // const per program
+  uniform sampler2D u_sampler;
+  uniform vec3 u_lightDir;
+  uniform float u_time;
+
+  // https://www.shadertoy.com/view/Xd3GRf - формула для вычисления непрерывного simplex noise
+  lowp vec4 permute(in lowp vec4 x) {
+    return mod(x*x*34.+x,289.);
+  }
+  lowp float snoise(in mediump vec3 v) {
+    const lowp vec2 C = vec2(0.16666666666,0.33333333333);
+    const lowp vec4 D = vec4(0,.5,1,2);
+    lowp vec3 i  = floor(C.y*(v.x+v.y+v.z) + v);
+    lowp vec3 x0 = C.x*(i.x+i.y+i.z) + (v - i);
+    lowp vec3 g = step(x0.yzx, x0);
+    lowp vec3 l = (1. - g).zxy;
+    lowp vec3 i1 = min( g, l );
+    lowp vec3 i2 = max( g, l );
+    lowp vec3 x1 = x0 - i1 + C.x;
+    lowp vec3 x2 = x0 - i2 + C.y;
+    lowp vec3 x3 = x0 - D.yyy;
+    i = mod(i,289.);
+    lowp vec4 p = permute( permute( permute(
+    i.z + vec4(0., i1.z, i2.z, 1.))
+    + i.y + vec4(0., i1.y, i2.y, 1.))
+    + i.x + vec4(0., i1.x, i2.x, 1.));
+    lowp vec3 ns = .142857142857 * D.wyz - D.xzx;
+    lowp vec4 j = -49. * floor(p * ns.z * ns.z) + p;
+    lowp vec4 x_ = floor(j * ns.z);
+    lowp vec4 x = x_ * ns.x + ns.yyyy;
+    lowp vec4 y = floor(j - 7. * x_ ) * ns.x + ns.yyyy;
+    lowp vec4 h = 1. - abs(x) - abs(y);
+    lowp vec4 b0 = vec4( x.xy, y.xy );
+    lowp vec4 b1 = vec4( x.zw, y.zw );
+    lowp vec4 sh = -step(h, vec4(0));
+    lowp vec4 a0 = b0.xzyw + (floor(b0)*2.+ 1.).xzyw*sh.xxyy;
+    lowp vec4 a1 = b1.xzyw + (floor(b1)*2.+ 1.).xzyw*sh.zzww;
+    lowp vec3 p0 = vec3(a0.xy,h.x);
+    lowp vec3 p1 = vec3(a0.zw,h.y);
+    lowp vec3 p2 = vec3(a1.xy,h.z);
+    lowp vec3 p3 = vec3(a1.zw,h.w);
+    lowp vec4 norm = inversesqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+    p0 *= norm.x;
+    p1 *= norm.y;
+    p2 *= norm.z;
+    p3 *= norm.w;
+    lowp vec4 m = max(.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.);
+    return .5 + 12. * dot( m * m * m, vec4( dot(p0,x0), dot(p1,x1),dot(p2,x2), dot(p3,x3) ) );
+  }
+
+  void main() {
+    vec3 L = -normalize(u_lightDir);
+
+    vec3 camPos = vec3(0.0, 0.0, 0.0);
+    vec3 V = normalize(v_worldPos - camPos);
+    vec3 N = v_normal;
+
+    float NoV = abs(dot(v_normal, V));
+    if (NoV < 0.3) {
+      discard;
+    }
+
+    vec3 R = reflect(-L, N);
+    //float specPower = pow(max(dot(R, V), 0.0), v_height >= 0.0 ? 8.0 : 24.0);
+
+    float noise = (snoise(v_pos * 1.0  * sin(u_time)) + 0.5 * snoise(v_pos * 2.0) + 0.25 * snoise(v_pos * 4.0) + 0.25 * snoise(v_pos * 8.0)) / 2.0;
+
+    float specPower = 2.0;
+    float specularStrength = 0.6;
+
+    if (noise < 0.7) {
+      discard;
+    }
+    //float noise = min(snoise(v_pos * 1.0) + 0.5 * snoise(v_pos * 2.0) + 0.25 * snoise(v_pos * 4.0), 1.0);
+    //color = vec3(noise);
+    //color = vec3(v_height);
+
+
+    float NoL = abs(dot(v_normal, -L)); // max(dot(v_normal, -L), 0.0);
+
+    vec3 lightColor = vec3(1.0, 1.0, 0.5) * 0.7;
+    vec3 color = vec3(1.0, 1.0, 1.0) * noise;
+    vec3 diffuse = NoL * color;
+    vec3 specular = specularStrength * pow(max(dot(R, V), 0.0), specPower) * lightColor;
+    vec3 ambient = color * 0.3;
+    vec3 resultLighting = diffuse + specular + ambient;
+    gl_FragColor = vec4(resultLighting, noise);
     //gl_FragColor = vec4(v_texCoord, 0.0, 1.0);
     //gl_FragColor = vec4(v_planetColor, 1.0);
   }`;

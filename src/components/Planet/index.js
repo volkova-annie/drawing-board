@@ -4,7 +4,9 @@ import ColorPicker from '../ColorPicker';
 import Render from '../../render/render'
 import {
   vertexPlanetShaderSource,
-  planetFragmentShaderSource
+  planetFragmentShaderSource,
+  cloudsVertexShaderSource,
+  cloudsFragmentShaderSource
 } from '../../render/shaders';
 import * as math from 'mathjs';
 import styles from './styles.css';
@@ -32,6 +34,7 @@ class Planet extends Component {
     this.handleColorEarth = this.handleColorEarth.bind(this);
     this.handleColorMountains = this.handleColorMountains.bind(this);
     this.handleColorSnow = this.handleColorSnow.bind(this);
+    this.handleWaterLevel = this.handleWaterLevel.bind(this);
 
     this.planet = React.createRef();
 
@@ -41,6 +44,7 @@ class Planet extends Component {
       canvasHeight: 512,
       gl: null,
       planetShaderProgram: null,
+      cloudsShaderProgram: null,
       isTetrahedronShow: false,
       isCubeShow: false,
       translateX: 0,
@@ -55,6 +59,7 @@ class Planet extends Component {
       scale: 0.2,
       touchStartPosition: null,
       mousePressed: false,
+      waterLevel: 0.55,
       waterColor: {
         r: '21.0',
         g: '135.0',
@@ -79,11 +84,7 @@ class Planet extends Component {
         b: '30.0',
         a: 1
       },
-      //waterColor: [255.0 / 255.0, g: 255.0 / 255.0, b: 255.0 / 255.0, a: 1],
-      //earthColor: {r: 140.0 / 255.0, g: 80.0 / 255.0, b: 9.0 / 255.0, a: 1},
-      //mountainsColor: {r: 92.0 / 255.0, g: 170.0 / 255.0, b: 30.0 / 255.0, a: 1}
-      //snowColor: {r: 21.0 / 255.0, g: 135.0 / 255.0, b: 259.0 / 255.0, a: 1}
-      //planetSurface: null,
+      bgPlanetColor: [4 / 255, 5 / 255, 45 / 255, 1],
     }
   }
 
@@ -99,8 +100,11 @@ class Planet extends Component {
 
     const vertexShader = render.createShader(gl, gl.VERTEX_SHADER, vertexPlanetShaderSource);
     const planetFragmentShader = render.createShader(gl, gl.FRAGMENT_SHADER, planetFragmentShaderSource);
-
     const planetShaderProgram = render.createProgram(gl, vertexShader, planetFragmentShader);
+
+    const cloudVertexShader = render.createShader(gl, gl.VERTEX_SHADER, cloudsVertexShaderSource);
+    const cloudFragmentShader = render.createShader(gl, gl.FRAGMENT_SHADER, cloudsFragmentShaderSource);
+    const cloudsShaderProgram = render.createProgram(gl, cloudVertexShader, cloudFragmentShader);
 
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
@@ -108,6 +112,7 @@ class Planet extends Component {
       gl,
       render,
       planetShaderProgram,
+      cloudsShaderProgram
     });
 
     //// load image
@@ -122,15 +127,18 @@ class Planet extends Component {
   }
 
   renderGL() {
-    const { gl, render, planetShaderProgram, isCubeShow, isTetrahedronShow,
+    const { gl, render, planetShaderProgram, cloudsShaderProgram, isCubeShow, isTetrahedronShow,
       translateX, translateY, translateZ, rotateX, rotateY, rotateZ, lightX, lightY, lightZ, scale,
-      snowColor, waterColor, earthColor, mountainsColor
+      snowColor, waterColor, earthColor, mountainsColor, waterLevel, bgPlanetColor
       //planetSurface
     } = this.state;
+
+    render.bgPlanetColor = bgPlanetColor;
 
     render.beginFrame();
 
     const FRACTION = 10000;
+    const time = new Date().getTime();
     const currentTime = (new Date().getTime() % FRACTION) / FRACTION;
 
     gl.useProgram(planetShaderProgram);
@@ -155,6 +163,7 @@ class Planet extends Component {
     gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_mountainsColor'), this.convertColor(mountainsColor));
     gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_earthColor'), this.convertColor(earthColor));
     gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_waterColor'), this.convertColor(waterColor));
+    gl.uniform1f(gl.getUniformLocation(planetShaderProgram, 'u_waterLevel'), waterLevel);
 
     //if (planetSurface) {
     //  gl.activeTexture(gl.TEXTURE0);
@@ -163,6 +172,23 @@ class Planet extends Component {
     //}
 
     render.drawPlanet(planetShaderProgram);
+
+    gl.useProgram(cloudsShaderProgram);
+
+    const cloudsScale = scale + 0.01;
+    const cloudsAngleY = rotateY - (time / 10000 * 10 % 360);
+    const cloudsTransform = this.getTransform({ translateX, translateY, translateZ, rotateX, rotateY: cloudsAngleY, rotateZ, scale: cloudsScale});
+    gl.uniformMatrix4fv(gl.getUniformLocation(cloudsShaderProgram, 'u_projection'), false, this.getPerspectiveMatrix());
+    gl.uniformMatrix4fv(gl.getUniformLocation(cloudsShaderProgram, 'u_transform'), false, cloudsTransform);
+    gl.uniform3f(gl.getUniformLocation(cloudsShaderProgram, 'u_lightDir'), lightX, lightY, lightZ);
+    gl.uniform1f(gl.getUniformLocation(cloudsShaderProgram, 'u_time'), currentTime / 2);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    render.drawPlanet(cloudsShaderProgram);
+
+    gl.disable(gl.BLEND);
 
     const transform = this.getTransform3x3();
     render.endFrame(transform); // todo: move to Render
@@ -381,13 +407,19 @@ class Planet extends Component {
     this.setState({ snowColor });
   }
 
+  handleWaterLevel(event) {
+    const waterLevel = event.target.value;
+    this.setState({ waterLevel });
+  }
 
-    render() {
+  render() {
     const {
       canvasWidth, canvasHeight, translateX, translateY, translateZ, rotateX, rotateY, rotateZ,
-      lightX, lightY, lightZ, scale,
-      waterColor, earthColor, mountainsColor, snowColor
+      lightX, lightY, lightZ, scale, bgPlanetColor,
+      waterColor, earthColor, mountainsColor, snowColor, waterLevel
     } = this.state;
+
+    const bgColor = { background: `rgba(${ bgPlanetColor[0] * 255}, ${ bgPlanetColor[1] * 255}, ${ bgPlanetColor[2] * 255 }, ${ bgPlanetColor[3] })`};
 
     return (
       <section className={ styles.wrapper }>
@@ -584,7 +616,21 @@ class Planet extends Component {
               onChange={ this.handleColorSnow }
             />
           </label>
+          <h3>Water Level</h3>
+          <label htmlFor='waterLevel'>
+            { Number(waterLevel).toFixed(2) }
+            <input
+              id='waterLevel'
+              type='range'
+              min='0'
+              max='1'
+              step='0.05'
+              value={ waterLevel }
+              onChange={ this.handleWaterLevel }
+            />
+          </label>
         </aside>
+        <div className={styles.background} style={ bgColor } />
       </section>
     )
   }

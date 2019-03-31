@@ -31,7 +31,7 @@ class ColorPicker extends Component {
   };
 
   render() {
-    const colorStyles = { background: `rgba(${ this.props.color.r }, ${ this.props.color.g }, ${ this.props.color.b }, ${ this.props.color.a })`}
+    const colorStyles = { background: `rgba(${ this.props.color.r }, ${ this.props.color.g }, ${ this.props.color.b }, ${ this.props.color.a })`};
 
     return (
       <div>
