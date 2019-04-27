@@ -1,4 +1,11 @@
+body {
+  height: 100%;
+  box-sizing: border-box;
+}
+
 .App {
+  height: 100%;
+  position: relative;
   text-align: center;
 }
 
@@ -10,10 +17,14 @@
 }
 
 .tab-control {
-  visibility: hidden;
-  width: 0;
-  height: 0;
-  margin: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  border: 0;
+  padding: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
 }
 
 .tab-label {
@@ -43,40 +54,4 @@ input[type='radio']:checked + label.tab-label {
 
 input[type='radio']:not(:checked) + label.tab-label {
   cursor: pointer;
-}
-
-input[type='range'] {
-  background-color: transparent;
-  overflow: hidden;
-  -webkit-appearance: none;
-}
-
-input[type='range']::-webkit-slider-thumb {
-  cursor: pointer;
-  -webkit-appearance: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #f3f3f3;
-  margin-top: -4px;
-}
-
-input[type='range']::-webkit-slider-runnable-track {
-  background-color: #43e5f7;
-  height: 2px;
-  -webkit-appearance: none;
-}
-
-input[type='range']::-moz-range-progress {
-  background-color: #43e5f7;
-}
-input[type='range']::-moz-range-track {
-  background-color: #9a905d;
-}
-/* IE*/
-input[type='range']::-ms-fill-lower {
-  background-color: #43e5f7;
-}
-input[type='range']::-ms-fill-upper {
-  background-color: #9a905d;
 }

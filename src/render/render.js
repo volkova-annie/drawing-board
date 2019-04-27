@@ -1,5 +1,5 @@
 import Texture from './texture'
-import { defaultFragmentShaderSource, vertexShaderSource } from './shaders';
+import { defaultFragmentShaderSource, vertexShaderSource, fxaaFragmentShaderSource } from './shaders';
 import Vec3 from './vec3'
 import * as math from 'mathjs';
 
@@ -24,8 +24,12 @@ export default class Render {
     this.bgPlanetColor = [4 / 255, 5 / 255, 45 / 255, 1];
 
     const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+
     const defaultFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, defaultFragmentShaderSource);
     this.defaultShaderProgram = this.createProgram(gl, vertexShader, defaultFragmentShader);
+
+    const fxaaFragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, fxaaFragmentShaderSource);
+    this.fxaaShaderProgram = this.createProgram(gl, vertexShader, fxaaFragmentShader);
   }
 
   createShader(gl, type, source) {
@@ -98,6 +102,28 @@ export default class Render {
     this.drawFullScreenQuad(this.defaultShaderProgram);
   }
 
+  fxaa() {
+    const { gl } = this;
+
+    const identityMat = math.flatten(math.identity(3)).toArray();
+
+    const fxaaTemp = this.availableRTs.fxaaTemp;
+    const currentRT = this.renderTargetsStack[this.renderTargetsStack.length - 1];
+    this.pushRenderTarget(fxaaTemp);
+    this.copyTexture(currentRT, identityMat);
+    this.popRenderTarget();
+
+    gl.useProgram(this.fxaaShaderProgram);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, fxaaTemp.texture);
+
+    gl.uniform1fv(gl.getUniformLocation(this.fxaaShaderProgram, 'u_quality'), [1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0]);
+    gl.uniform1i(gl.getUniformLocation(this.fxaaShaderProgram, 'u_sampler'), 0);
+    gl.uniformMatrix3fv(gl.getUniformLocation(this.fxaaShaderProgram, 'u_transform'), false, identityMat);
+    this.drawFullScreenQuad(this.fxaaShaderProgram);
+  }
+
   get frontBuffer() {
     return this._frontBuffer;
   }
@@ -105,7 +131,8 @@ export default class Render {
   createRTs() {
     this.availableRTs = {
       fullResA: this.createRenderTarget(this.width, this.height),
-      fullResB: this.createRenderTarget(this.width, this.height)
+      fullResB: this.createRenderTarget(this.width, this.height),
+      fxaaTemp: this.createRenderTarget(this.width, this.height)
     }
   }
 
@@ -479,6 +506,7 @@ export default class Render {
         const color = [87/255, 51/255, 155/255];
         //const color = [Math.random(), Math.random(), Math.random()];
 
+        const quadVertices = [];
         // fill per vertex data
         for (let i = 0; i < positionsXY.length; i += 2) {
           const transformedPosition = math.multiply(math.matrix([positionsXY[i], positionsXY[i + 1], 0.0, 1.0]), transform).toArray();
@@ -510,6 +538,10 @@ export default class Render {
           //vertices.push.apply(vertices, [normal.x, normal.y, normal.z]); // vertex normal
           numVertices++;
         }
+
+        quadVertices.forEach(el => {
+          vertices.push(el);
+        });
 
         const startIdx = meshStartIdx + 4 * (currentStepX + currentStepY * steps);
         idxs.push(startIdx, startIdx + 1, startIdx + 2, startIdx + 2, startIdx + 1, startIdx + 3);
@@ -607,9 +639,9 @@ export default class Render {
     gl.useProgram(shaderProgram);
 
     gl.enable(gl.DEPTH_TEST);
-    gl.frontFace(gl.CW);
+    gl.frontFace(gl.CCW);
     gl.cullFace(gl.BACK);
-    //gl.enable(gl.CULL_FACE);
+    gl.enable(gl.CULL_FACE);
 
     const { vertices: positionBuffer, indices: idxBuffer, indicesCount: count } = this.getPlanetPositionBuffer();
 

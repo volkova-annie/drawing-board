@@ -12,6 +12,7 @@
   left: 0;
   right: 0;
   z-index: -1;
+  min-height: 610px;
 }
 
 .header, .aside {
@@ -21,16 +22,6 @@
   margin-bottom: 15px;
   color: rgba(255, 255, 255, 0.5);
   letter-spacing: 0.7px;
-}
-
-.header {
-  min-width: 245px;
-}
-
-.aside {
-  align-self: flex-start;
-  margin-top: 10px;
-  flex-shrink: 0.5;
 }
 
 .column-header {
@@ -52,3 +43,41 @@
 .rangeCaption {
   width: 90px;
 }
+
+input[type='range'] {
+  background-color: transparent;
+  -webkit-appearance: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  cursor: pointer;
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #3d92f7;
+  margin-top: -4px;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  background-color: #43e5f7;
+  height: 2px;
+  -webkit-appearance: none;
+}
+
+input[type='range']::-moz-range-progress {
+  background-color: #43e5f7;
+}
+
+input[type='range']::-moz-range-track {
+  background-color: #9a905d;
+}
+
+/* IE*/
+/*input[type='range']::-ms-fill-lower {
+  background-color: #43e5f7;
+}
+
+input[type='range']::-ms-fill-upper {
+  background-color: #9a905d;
+}*/

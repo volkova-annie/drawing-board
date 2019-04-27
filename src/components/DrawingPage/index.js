@@ -113,14 +113,14 @@ class DrawingPage extends Component {
               { (this.state.scale * 100).toFixed() } %
             </label>
           </div>
-          <button onClick={ this.handleBW }>
+          <button onClick={ this.handleBW } className={ styles['animated-button'] }>
             Black&White
           </button>
-          <button onClick={ this.handleAnimate }>
+          <button onClick={ this.handleAnimate } className={ styles['animated-button'] }>
             Animate me
           </button>
           <button
-            onClick={ this.handleReset }>
+            onClick={ this.handleReset } className={ styles['animated-button'] }>
             Reset
           </button>
         </div>

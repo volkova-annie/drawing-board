@@ -38,4 +38,22 @@
   width: 90px;
   flex-shrink: 0;
   display: inline-block;
+  letter-spacing: 0.7px;
+}
+
+.animated-button {
+  cursor: pointer;
+  padding: 5px 32px;
+  color: #029ee4;
+  background-color: #ffffff;
+  white-space: nowrap;
+  border: 1px solid #029ee4;
+  border-radius: 15px;
+  letter-spacing: 0.7px;
+  transition: all .3s ease;
+}
+
+.animated-button:hover {
+  background-color: #029ee4;
+  color: #ffffff;
 }

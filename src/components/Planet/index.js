@@ -2,6 +2,7 @@ import { Component } from 'react';
 import React from 'react';
 import ColorPicker from '../ColorPicker';
 import Render from '../../render/render'
+import Vec3 from '../../render/vec3'
 import {
   vertexPlanetShaderSource,
   planetFragmentShaderSource,
@@ -10,6 +11,7 @@ import {
 } from '../../render/shaders';
 import * as math from 'mathjs';
 import styles from './styles.css';
+import Camera from '../../render/camera';
 //import reign_image from '../../images/rhein.jpg';
 
 class Planet extends Component {
@@ -20,13 +22,12 @@ class Planet extends Component {
     this.handleTranslateX = this.handleTranslateX.bind(this);
     this.handleTranslateY = this.handleTranslateY.bind(this);
     this.handleTranslateZ = this.handleTranslateZ.bind(this);
-    this.handleRotateX = this.handleRotateX.bind(this);
-    this.handleRotateY = this.handleRotateY.bind(this);
-    this.handleRotateZ = this.handleRotateZ.bind(this);
+    this.handleCameraX = this.handleCameraX.bind(this);
+    this.handleCameraY = this.handleCameraY.bind(this);
+    this.handleCameraZ = this.handleCameraZ.bind(this);
     this.handleLightX = this.handleLightX.bind(this);
     this.handleLightY = this.handleLightY.bind(this);
     this.handleLightZ = this.handleLightZ.bind(this);
-    this.handleScale = this.handleScale.bind(this);
     this.handleMouseDown = this.handleMouseDown.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseUp = this.handleMouseUp.bind(this);
@@ -40,6 +41,7 @@ class Planet extends Component {
 
     this.state = {
       render: null,
+      camera: null,
       canvasWidth: 1024,
       canvasHeight: 512,
       gl: null,
@@ -49,14 +51,13 @@ class Planet extends Component {
       isCubeShow: false,
       translateX: 0,
       translateY: 0,
-      translateZ: -0.5,
-      rotateX: 0,
-      rotateY: 0,
-      rotateZ: 0,
+      translateZ: 0,
+      cameraX: 0,
+      cameraY: 0,
+      cameraZ: 3.0,
       lightX: 0.6,
       lightY: 0.55,
       lightZ: 0.35,
-      scale: 0.2,
       touchStartPosition: null,
       mousePressed: false,
       waterLevel: 0.55,
@@ -96,6 +97,9 @@ class Planet extends Component {
       return;
     }
 
+    const { translateX, translateY, translateZ } = this.state;
+    const camera = new Camera(new Vec3(Number(translateX), Number(translateY), Number(translateZ)), new Vec3(0.0, 0.0, 0.0), new Vec3(0.0, 1.0, 0.0));
+
     const render = new Render(gl, this.state.canvasWidth, this.state.canvasHeight);
 
     const vertexShader = render.createShader(gl, gl.VERTEX_SHADER, vertexPlanetShaderSource);
@@ -111,52 +115,39 @@ class Planet extends Component {
     this.setState({
       gl,
       render,
+      camera,
       planetShaderProgram,
       cloudsShaderProgram
     });
 
-    //// load image
-    //const image = new Image();
-    //image.onload = () => {
-    //  this.setState({ planetSurface: render.createTexture(image) });
-    //};
-    //image.src = reign_image;
-
     // Вызов renderGL 100 кадров в секунду
-    setInterval(this.renderGL, 100);
+    //setInterval(this.renderGL, 100);
+
+    requestAnimationFrame(this.renderGL);
   }
 
   renderGL() {
-    const { gl, render, planetShaderProgram, cloudsShaderProgram, isCubeShow, isTetrahedronShow,
-      translateX, translateY, translateZ, rotateX, rotateY, rotateZ, lightX, lightY, lightZ, scale,
+    const { gl, render, planetShaderProgram, cloudsShaderProgram, camera, 
+      cameraX, cameraY, cameraZ, lightX, lightY, lightZ,
       snowColor, waterColor, earthColor, mountainsColor, waterLevel, bgPlanetColor
-      //planetSurface
     } = this.state;
 
     render.bgPlanetColor = bgPlanetColor;
 
     render.beginFrame();
 
-    const FRACTION = 10000;
-    const time = new Date().getTime();
-    const currentTime = (new Date().getTime() % FRACTION) / FRACTION;
+    const FRACTION = 100000;
+    const time = new Date().getTime(); // 1556361728843;
+    const currentTime = (time * 5 % FRACTION) / FRACTION;
 
     gl.useProgram(planetShaderProgram);
+
+    camera.position = new Vec3(Number(cameraX), Number(cameraY), Number(cameraZ));
+
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_projection'), false, this.getPerspectiveMatrix());
 
-    if (isCubeShow) {
-      const modelTransform = this.getTransform({ translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale });
-      gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelTransform);
-      render.drawCube(planetShaderProgram);
-    }
-
-    if (isTetrahedronShow) {
-      const modelTetraTransform = this.getTransform({ translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale });
-      gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelTetraTransform);
-      render.drawTetrahedron(planetShaderProgram);
-    }
-
-    const modelPlanetTransform = this.getTransform({ translateX, translateY, translateZ, rotateX, rotateY, rotateZ, scale });
+    const planetAngleY = (time / 10000 * -10 % 360);
+    const modelPlanetTransform = this.getTransform({ rotateY: planetAngleY });
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelPlanetTransform);
     gl.uniform3f(gl.getUniformLocation(planetShaderProgram, 'u_lightDir'), lightX, lightY, lightZ);
     gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_snowColor'), this.convertColor(snowColor));
@@ -165,33 +156,33 @@ class Planet extends Component {
     gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_waterColor'), this.convertColor(waterColor));
     gl.uniform1f(gl.getUniformLocation(planetShaderProgram, 'u_waterLevel'), waterLevel);
 
-    //if (planetSurface) {
-    //  gl.activeTexture(gl.TEXTURE0);
-    //  gl.bindTexture(gl.TEXTURE_2D, planetSurface.texture);
-    //  gl.uniform1i(gl.getUniformLocation(planetShaderProgram, 'u_sampler'), 0);
-    //}
-
+    gl.uniform3f(gl.getUniformLocation(planetShaderProgram, 'u_eye'), camera.position.x, camera.position.y, camera.position.z);
+   
     render.drawPlanet(planetShaderProgram);
 
     gl.useProgram(cloudsShaderProgram);
 
-    const cloudsScale = scale + 0.01;
-    const cloudsAngleY = rotateY - (time / 10000 * 10 % 360);
-    const cloudsTransform = this.getTransform({ translateX, translateY, translateZ, rotateX, rotateY: cloudsAngleY, rotateZ, scale: cloudsScale});
+    const cloudsScale = 1.03;
+    const cloudsAngleY = (time / 10000 * 10 % 360);
+    const cloudsTransform = this.getTransform({rotateY: cloudsAngleY, scale: cloudsScale});
     gl.uniformMatrix4fv(gl.getUniformLocation(cloudsShaderProgram, 'u_projection'), false, this.getPerspectiveMatrix());
     gl.uniformMatrix4fv(gl.getUniformLocation(cloudsShaderProgram, 'u_transform'), false, cloudsTransform);
     gl.uniform3f(gl.getUniformLocation(cloudsShaderProgram, 'u_lightDir'), lightX, lightY, lightZ);
-    gl.uniform1f(gl.getUniformLocation(cloudsShaderProgram, 'u_time'), currentTime / 2);
-
+    gl.uniform1f(gl.getUniformLocation(cloudsShaderProgram, 'u_time'), currentTime);
+    gl.uniform3f(gl.getUniformLocation(cloudsShaderProgram, 'u_eye'), camera.position.x, camera.position.y, camera.position.z);
+    
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     render.drawPlanet(cloudsShaderProgram);
-
     gl.disable(gl.BLEND);
+
+    render.fxaa();
 
     const transform = this.getTransform3x3();
     render.endFrame(transform); // todo: move to Render
+
+    requestAnimationFrame(this.renderGL);
   }
 
   convertColor(color) {
@@ -203,7 +194,7 @@ class Planet extends Component {
   }
 
   getPerspectiveMatrix() {
-    const { canvasWidth, canvasHeight } = this.state;
+    const { canvasWidth, canvasHeight, camera } = this.state;
 
     const f = 100;
     const n = 0.1;
@@ -217,8 +208,6 @@ class Planet extends Component {
 
     const a0 = scale / aspect; // 2 * n / (r - l);
     const a1 = scale; //2 * n / (t - b);
-    const x = (r + l) / (r - l);
-    const y = (t + b) / (t - b);
     const c = (f + n) / (n - f);
     const d = 2 * f * n / (n - f);
     const perspective = math.matrix([
@@ -228,8 +217,9 @@ class Planet extends Component {
       [0,  0, d, 0]
     ]);
 
-    const result = math.flatten(perspective).toArray();
-    return result;
+    const view_projection = math.multiply(camera.transform, perspective);
+
+    return math.flatten(view_projection).toArray();
   }
 
   getTransform(transformParams) {
@@ -333,21 +323,19 @@ class Planet extends Component {
     this.setState({ translateZ: value });
   }
 
-  handleRotateX(event) {
+  handleCameraX(event) {
     const { value } = event.target;
-    this.setState({ rotateX: value });
+    this.setState({ cameraX: value });
   }
 
-  handleRotateY(event) {
+  handleCameraY(event) {
     const { value } = event.target;
-    console.log(value);
-    console.log(this.state.rotateY);
-    this.setState({ rotateY: value });
+    this.setState({ cameraY: value });
   }
 
-  handleRotateZ(event) {
+  handleCameraZ(event) {
     const { value } = event.target;
-    this.setState({ rotateZ: value });
+    this.setState({ cameraZ: value });
   }
 
   handleLightX(event) {
@@ -365,11 +353,6 @@ class Planet extends Component {
     this.setState({ lightZ: value });
   }
 
-  handleScale(event) {
-    const { value } = event.target;
-    this.setState({ scale: value });
-  }
-
   handleMouseDown() {
     //const { clientX, clientY } = event;
     this.setState({ mousePressed: true });
@@ -377,11 +360,13 @@ class Planet extends Component {
 
   handleMouseMove(event) {
     const { movementX, movementY } = event;
+    const min = -1;
+    const max = 1;
     if ( this.state.mousePressed ){
       this.setState((state) => {
         return {
-          rotateX: state.rotateX - movementY,
-          rotateY: Number(state.rotateY) + movementX
+          cameraX: Math.min(Math.max(state.cameraX - movementX * 0.05, min), max).toFixed(2),
+          cameraY: Math.min(Math.max(Number(state.cameraY) + movementY * 0.05, min), max).toFixed(2) 
         }
       });
     }
@@ -414,8 +399,8 @@ class Planet extends Component {
 
   render() {
     const {
-      canvasWidth, canvasHeight, translateX, translateY, translateZ, rotateX, rotateY, rotateZ,
-      lightX, lightY, lightZ, scale, bgPlanetColor,
+      canvasWidth, canvasHeight, cameraX, cameraY, cameraZ,
+      lightX, lightY, lightZ, bgPlanetColor,
       waterColor, earthColor, mountainsColor, snowColor, waterLevel
     } = this.state;
 
@@ -425,92 +410,46 @@ class Planet extends Component {
       <section className={ styles.wrapper }>
         <header className={ styles.header }>
           <div className={ styles['column-header'] }>
-            <h3>Translate</h3>
-            <label htmlFor='translateX'>
-              <span className={ styles.rangeCaption }>translateX:</span>
+            <h3>Camera</h3>
+            <label htmlFor='cameraX'>
+              <span className={ styles.rangeCaption }>cameraX:</span>
               <input
-                id='translateX'
+                id='cameraX'
                 type='range'
-                min='-3'
-                max='3'
-                step='0.2'
-                value={ translateX }
-                onChange={ this.handleTranslateX }
+                min='-1'
+                max='1'
+                step='0.1'
+                value={ cameraX }
+                onChange={ this.handleCameraX }
               />
-              { translateX }
+              { cameraX }
             </label>
 
-            <label htmlFor='translateY'>
-              <span className={ styles.rangeCaption }>translateY:</span>
+            <label htmlFor='cameraY'>
+              <span className={ styles.rangeCaption }>cameraY:</span>
               <input
-                id='translateY'
+                id='cameraY'
                 type='range'
-                min='-3'
-                max='3'
-                step='0.2'
-                value={ translateY }
-                onChange={ this.handleTranslateY }
+                min='-1'
+                max='1'
+                step='0.1'
+                value={ cameraY }
+                onChange={ this.handleCameraY }
               />
-              { translateY }
+              { cameraY }
             </label>
-
-            <label htmlFor='translateZ'>
-              <span className={ styles.rangeCaption }>translateZ:</span>
+            <label htmlFor='cameraZ'>
+              <span className={ styles.rangeCaption }>cameraZ:</span>
               <input
-                id='translateZ'
+                id='cameraZ'
                 type='range'
-                min='-10'
-                max='0'
-                step='0.2'
-                value={ translateZ }
-                onChange={ this.handleTranslateZ }
+                min='3'
+                max='10'
+                step='0.1'
+                value={ cameraZ }
+                onChange={ this.handleCameraZ }
               />
-              { translateZ }
-            </label>
-          </div>
-
-          <div className={ styles['column-header'] }>
-            <h3>Angle</h3>
-            <label htmlFor='rotateX'>
-              <span className={ styles.rangeCaption }>rotateX:</span>
-              <input
-                id='rotateX'
-                type='range'
-                min='0'
-                max='360'
-                step='1'
-                value={ rotateX }
-                onChange={ this.handleRotateX }
-              />
-              { rotateX }
-            </label>
-
-            <label htmlFor='rotateY'>
-              <span className={ styles.rangeCaption }>rotateY:</span>
-              <input
-                id='rotateY'
-                type='range'
-                min='0'
-                max='360'
-                step='1'
-                value={ rotateY }
-                onChange={ this.handleRotateY }
-              />
-              { rotateY }
-            </label>
-
-            <label htmlFor='rotateZ'>
-              <span className={ styles.rangeCaption }>rotateZ:</span>
-              <input
-                id='rotateZ'
-                type='range'
-                min='0'
-                max='360'
-                step='1'
-                value={ rotateZ }
-                onChange={ this.handleRotateZ }
-              />
-              { rotateZ }
+              { cameraZ }
             </label>
           </div>
 
@@ -556,23 +495,6 @@ class Planet extends Component {
                 onChange={ this.handleLightZ }
               />
               { lightZ }
-            </label>
-          </div>
-
-          <div className={ styles['column-header'] }>
-            <h3>Scale</h3>
-            <label htmlFor='scale'>
-              <span className={ styles.rangeCaption } >scale:</span>
-              <input
-                id='scale'
-                type='range'
-                min='0.1'
-                max='1'
-                step='0.05'
-                value={ scale }
-                onChange={ this.handleScale }
-              />
-              { scale }
             </label>
           </div>
         </header>

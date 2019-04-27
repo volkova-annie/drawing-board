@@ -19,8 +19,8 @@ class DrawingPage extends Component {
     this.canvas = React.createRef();
 
     this.state = {
-      canvasWidth: 1024,
-      canvasHeight: 512,
+      canvasWidth: 1023,
+      canvasHeight: 511,
       gl: null,
       render: null,
       blurShaderProgram: null,
