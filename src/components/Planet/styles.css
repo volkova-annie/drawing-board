@@ -1,7 +1,6 @@
 .wrapper {
   display: flex;
-  align-items: center;
-  margin: 20px auto;
+  margin: 45px auto;
   padding: 0 20px;
 }
 
@@ -15,7 +14,7 @@
   min-height: 610px;
 }
 
-.header, .aside {
+.controls {
   display: flex;
   flex-direction: column;
   height: auto;
@@ -24,17 +23,17 @@
   letter-spacing: 0.7px;
 }
 
-.column-header {
+.column-controls {
   display: flex;
   flex-direction: column;
 }
 
-.column-header label, .aside label {
+.column-controls label, .aside label {
   display: flex;
   margin-bottom: 5px;
 }
 
-.column-header input, aside input {
+.column-controls input, aside input {
   margin-right: 10px;
   width: 100px;
   opacity: 0.5;

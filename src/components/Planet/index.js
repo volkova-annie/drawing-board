@@ -54,7 +54,7 @@ class Planet extends Component {
       translateZ: 0,
       cameraX: 0,
       cameraY: 0,
-      cameraZ: 3.0,
+      cameraZ: 2.5,
       lightX: 0.6,
       lightY: 0.55,
       lightZ: 0.35,
@@ -127,7 +127,7 @@ class Planet extends Component {
   }
 
   renderGL() {
-    const { gl, render, planetShaderProgram, cloudsShaderProgram, camera, 
+    const { gl, render, planetShaderProgram, cloudsShaderProgram, camera,
       cameraX, cameraY, cameraZ, lightX, lightY, lightZ,
       snowColor, waterColor, earthColor, mountainsColor, waterLevel, bgPlanetColor
     } = this.state;
@@ -157,7 +157,7 @@ class Planet extends Component {
     gl.uniform1f(gl.getUniformLocation(planetShaderProgram, 'u_waterLevel'), waterLevel);
 
     gl.uniform3f(gl.getUniformLocation(planetShaderProgram, 'u_eye'), camera.position.x, camera.position.y, camera.position.z);
-   
+
     render.drawPlanet(planetShaderProgram);
 
     gl.useProgram(cloudsShaderProgram);
@@ -170,7 +170,7 @@ class Planet extends Component {
     gl.uniform3f(gl.getUniformLocation(cloudsShaderProgram, 'u_lightDir'), lightX, lightY, lightZ);
     gl.uniform1f(gl.getUniformLocation(cloudsShaderProgram, 'u_time'), currentTime);
     gl.uniform3f(gl.getUniformLocation(cloudsShaderProgram, 'u_eye'), camera.position.x, camera.position.y, camera.position.z);
-    
+
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -238,7 +238,7 @@ class Planet extends Component {
       scale, rotateX, rotateY, rotateZ, translateX, translateY, translateZ,
     } = params;
     let matrix = math.identity(4);
-    
+
     const scaleMat = math.matrix([
       [scale, 0,     0,     0],
       [0,     scale, 0,     0],
@@ -366,7 +366,7 @@ class Planet extends Component {
       this.setState((state) => {
         return {
           cameraX: Math.min(Math.max(state.cameraX - movementX * 0.05, min), max).toFixed(2),
-          cameraY: Math.min(Math.max(Number(state.cameraY) + movementY * 0.05, min), max).toFixed(2) 
+          cameraY: Math.min(Math.max(Number(state.cameraY) + movementY * 0.05, min), max).toFixed(2)
         }
       });
     }
@@ -408,8 +408,8 @@ class Planet extends Component {
 
     return (
       <section className={ styles.wrapper }>
-        <header className={ styles.header }>
-          <div className={ styles['column-header'] }>
+        <div className={ styles.controls }>
+          <div className={ styles['column-controls'] }>
             <h3>Camera</h3>
             <label htmlFor='cameraX'>
               <span className={ styles.rangeCaption }>cameraX:</span>
@@ -443,7 +443,7 @@ class Planet extends Component {
               <input
                 id='cameraZ'
                 type='range'
-                min='3'
+                min='2'
                 max='10'
                 step='0.1'
                 value={ cameraZ }
@@ -453,7 +453,7 @@ class Planet extends Component {
             </label>
           </div>
 
-          <div className={ styles['column-header'] }>
+          <div className={ styles['column-controls'] }>
             <h3>Light</h3>
             <label htmlFor='lightX'>
               <span className={ styles.rangeCaption }>lightX:</span>
@@ -497,7 +497,51 @@ class Planet extends Component {
               { lightZ }
             </label>
           </div>
-        </header>
+          <div className={ styles.aside }>
+            <h3>Planet Colors</h3>
+            <label>
+              <span className={ styles.rangeCaption }>Water:</span>
+              <ColorPicker
+                  color={ waterColor }
+                  onChange={ this.handleColorWater }
+              />
+            </label>
+            <label>
+              <span className={ styles.rangeCaption }>Earth:</span>
+              <ColorPicker
+                  color={ earthColor }
+                  onChange={ this.handleColorEarth }
+              />
+            </label>
+            <label>
+              <span className={ styles.rangeCaption }>Mountains:</span>
+              <ColorPicker
+                  color={ mountainsColor }
+                  onChange={ this.handleColorMountains }
+              />
+            </label>
+            <label>
+              <span className={ styles.rangeCaption }>Snow:</span>
+              <ColorPicker
+                  color={ snowColor }
+                  onChange={ this.handleColorSnow }
+              />
+            </label>
+            <h3>Water Level</h3>
+            <label htmlFor='waterLevel'>
+              { Number(waterLevel).toFixed(2) }
+              <input
+                  id='waterLevel'
+                  type='range'
+                  min='0'
+                  max='1'
+                  step='0.05'
+                  value={ waterLevel }
+                  onChange={ this.handleWaterLevel }
+              />
+            </label>
+          </div>
+        </div>
         <div>
           <canvas
             ref={ this.planet }
@@ -506,52 +550,9 @@ class Planet extends Component {
             onMouseDown={ this.handleMouseDown }
             onMouseMove={ this.handleMouseMove }
             onMouseUp={ this.handleMouseUp }
+            style={{ position: 'absolute', left: 'calc(50% - 512px)' }}
           />
         </div>
-        <aside className={ styles.aside }>
-          <h3>Planet Colors</h3>
-          <label>
-            <span className={ styles.rangeCaption }>Water:</span>
-            <ColorPicker
-              color={ waterColor }
-              onChange={ this.handleColorWater }
-            />
-          </label>
-          <label>
-            <span className={ styles.rangeCaption }>Earth:</span>
-            <ColorPicker
-              color={ earthColor }
-              onChange={ this.handleColorEarth }
-            />
-          </label>
-          <label>
-            <span className={ styles.rangeCaption }>Mountains:</span>
-            <ColorPicker
-              color={ mountainsColor }
-              onChange={ this.handleColorMountains }
-            />
-          </label>
-          <label>
-            <span className={ styles.rangeCaption }>Snow:</span>
-            <ColorPicker
-              color={ snowColor }
-              onChange={ this.handleColorSnow }
-            />
-          </label>
-          <h3>Water Level</h3>
-          <label htmlFor='waterLevel'>
-            { Number(waterLevel).toFixed(2) }
-            <input
-              id='waterLevel'
-              type='range'
-              min='0'
-              max='1'
-              step='0.05'
-              value={ waterLevel }
-              onChange={ this.handleWaterLevel }
-            />
-          </label>
-        </aside>
         <div className={styles.background} style={ bgColor } />
       </section>
     )
