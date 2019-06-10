@@ -451,7 +451,7 @@ class Planet extends Component {
               <input
                 id='cameraZ'
                 type='range'
-                min='2'
+                min='1'
                 max='10'
                 step='0.1'
                 value={ cameraZ }

@@ -1,6 +1,6 @@
 .wrapper {
   display: flex;
-  margin: 45px auto;
+  margin: 45px auto 0;
   padding: 0 20px;
 }
 
@@ -18,9 +18,9 @@
   display: flex;
   flex-direction: column;
   height: auto;
-  margin-bottom: 15px;
   color: rgba(255, 255, 255, 0.5);
   letter-spacing: 0.7px;
+  z-index: 2;
 }
 
 .column-controls {
