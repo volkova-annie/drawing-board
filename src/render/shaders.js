@@ -1,3 +1,61 @@
+export const common = `
+// https://www.shadertoy.com/view/Xd3GRf - формула для вычисления непрерывного simplex noise
+lowp vec4 permute(in lowp vec4 x) {
+  return mod(x*x*34.+x,289.);
+}
+lowp float snoise(in mediump vec3 v) {
+  const lowp vec2 C = vec2(0.16666666666,0.33333333333);
+  const lowp vec4 D = vec4(0,.5,1,2);
+  lowp vec3 i  = floor(C.y*(v.x+v.y+v.z) + v);
+  lowp vec3 x0 = C.x*(i.x+i.y+i.z) + (v - i);
+  lowp vec3 g = step(x0.yzx, x0);
+  lowp vec3 l = (1. - g).zxy;
+  lowp vec3 i1 = min( g, l );
+  lowp vec3 i2 = max( g, l );
+  lowp vec3 x1 = x0 - i1 + C.x;
+  lowp vec3 x2 = x0 - i2 + C.y;
+  lowp vec3 x3 = x0 - D.yyy;
+  i = mod(i,289.);
+  lowp vec4 p = permute( permute( permute(
+  i.z + vec4(0., i1.z, i2.z, 1.))
+  + i.y + vec4(0., i1.y, i2.y, 1.))
+  + i.x + vec4(0., i1.x, i2.x, 1.));
+  lowp vec3 ns = .142857142857 * D.wyz - D.xzx;
+  lowp vec4 j = -49. * floor(p * ns.z * ns.z) + p;
+  lowp vec4 x_ = floor(j * ns.z);
+  lowp vec4 x = x_ * ns.x + ns.yyyy;
+  lowp vec4 y = floor(j - 7. * x_ ) * ns.x + ns.yyyy;
+  lowp vec4 h = 1. - abs(x) - abs(y);
+  lowp vec4 b0 = vec4( x.xy, y.xy );
+  lowp vec4 b1 = vec4( x.zw, y.zw );
+  lowp vec4 sh = -step(h, vec4(0));
+  lowp vec4 a0 = b0.xzyw + (floor(b0)*2.+ 1.).xzyw*sh.xxyy;
+  lowp vec4 a1 = b1.xzyw + (floor(b1)*2.+ 1.).xzyw*sh.zzww;
+  lowp vec3 p0 = vec3(a0.xy,h.x);
+  lowp vec3 p1 = vec3(a0.zw,h.y);
+  lowp vec3 p2 = vec3(a1.xy,h.z);
+  lowp vec3 p3 = vec3(a1.zw,h.w);
+  lowp vec4 norm = inversesqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+  p0 *= norm.x;
+  p1 *= norm.y;
+  p2 *= norm.z;
+  p3 *= norm.w;
+  lowp vec4 m = max(.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.);
+  return .5 + 12. * dot( m * m * m, vec4( dot(p0,x0), dot(p1,x1),dot(p2,x2), dot(p3,x3) ) );
+}
+
+const float PI = 3.1415926535897932384626433832795;
+float cloudsIntensity(vec3 pos, float time) {
+  float noise = (snoise(pos * 1.0 ) + 0.5 * snoise(pos * 2.0) + 0.25 * snoise(pos * 4.0) + 0.25 * snoise(pos * 8.0))  * sin(time * PI) / 2.0;
+  noise = clamp(noise + 0.1, 0.0, 1.0);
+
+  if (noise <= 0.7) {
+    noise = noise * smoothstep(0.5, 0.7, noise);
+  }
+  return noise;
+}
+`;
+
 export const vertexShaderSource = `
 // атрибут, который будет получать данные из буфера
 attribute vec3 a_position;
@@ -317,94 +375,49 @@ void main() {
 }`;
 
 export const vertexPlanetShaderSource = `
+precision mediump float;
 // атрибут, который будет получать данные из буфера
 // input from javascript
 attribute vec3 a_position;
-attribute vec3 a_color;
-attribute vec2 a_texCoord;
-attribute vec3 a_normal;
+attribute vec3 a_tangent;
 
 // output to fragment shader
-varying highp vec3 v_color;
-varying highp vec2 v_texCoord;
 varying vec3 v_normal;
 varying vec3 v_worldPos;
 varying vec3 v_planetColor;
 varying float v_height;
 varying vec3 v_pos;
+varying vec3 v_tangent;
 
 // const
 uniform mat4 u_transform;
 uniform mat4 u_projection;
-uniform mediump float u_waterLevel;
+uniform float u_waterLevel;
+uniform float u_mountainHeight;
 
-// https://www.shadertoy.com/view/Xd3GRf - формула для вычисления непрерывного simplex noise
-lowp vec4 permute(in lowp vec4 x) {
-  return mod(x*x*34.+x,289.);
-}
-lowp float snoise(in mediump vec3 v) {
-  const lowp vec2 C = vec2(0.16666666666,0.33333333333);
-  const lowp vec4 D = vec4(0,.5,1,2);
-  lowp vec3 i  = floor(C.y*(v.x+v.y+v.z) + v);
-  lowp vec3 x0 = C.x*(i.x+i.y+i.z) + (v - i);
-  lowp vec3 g = step(x0.yzx, x0);
-  lowp vec3 l = (1. - g).zxy;
-  lowp vec3 i1 = min( g, l );
-  lowp vec3 i2 = max( g, l );
-  lowp vec3 x1 = x0 - i1 + C.x;
-  lowp vec3 x2 = x0 - i2 + C.y;
-  lowp vec3 x3 = x0 - D.yyy;
-  i = mod(i,289.);
-  lowp vec4 p = permute( permute( permute(
-  i.z + vec4(0., i1.z, i2.z, 1.))
-  + i.y + vec4(0., i1.y, i2.y, 1.))
-  + i.x + vec4(0., i1.x, i2.x, 1.));
-  lowp vec3 ns = .142857142857 * D.wyz - D.xzx;
-  lowp vec4 j = -49. * floor(p * ns.z * ns.z) + p;
-  lowp vec4 x_ = floor(j * ns.z);
-  lowp vec4 x = x_ * ns.x + ns.yyyy;
-  lowp vec4 y = floor(j - 7. * x_ ) * ns.x + ns.yyyy;
-  lowp vec4 h = 1. - abs(x) - abs(y);
-  lowp vec4 b0 = vec4( x.xy, y.xy );
-  lowp vec4 b1 = vec4( x.zw, y.zw );
-  lowp vec4 sh = -step(h, vec4(0));
-  lowp vec4 a0 = b0.xzyw + (floor(b0)*2.+ 1.).xzyw*sh.xxyy;
-  lowp vec4 a1 = b1.xzyw + (floor(b1)*2.+ 1.).xzyw*sh.zzww;
-  lowp vec3 p0 = vec3(a0.xy,h.x);
-  lowp vec3 p1 = vec3(a0.zw,h.y);
-  lowp vec3 p2 = vec3(a1.xy,h.z);
-  lowp vec3 p3 = vec3(a1.zw,h.w);
-  lowp vec4 norm = inversesqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-  p0 *= norm.x;
-  p1 *= norm.y;
-  p2 *= norm.z;
-  p3 *= norm.w;
-  lowp vec4 m = max(.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.);
-  return .5 + 12. * dot( m * m * m, vec4( dot(p0,x0), dot(p1,x1),dot(p2,x2), dot(p3,x3) ) );
-}
+#common
 
+float getHeight(vec3 pos) {
+  float height = clamp((snoise(pos * 1.0) + 0.5 * snoise(pos * 2.0) + 0.25 * snoise(pos * 4.0)) / 1.75, u_waterLevel, 1.0);
+  float heightAboveWater = max(height - u_waterLevel, 0.0);
+  float normalizedHeightAboveWater = heightAboveWater / (1.0 - u_waterLevel);
+  return normalizedHeightAboveWater;
+}
 // все шейдеры имеют функцию main
 void main() {
   vec4 worldPos = (u_transform * vec4(a_position, 1.0));
 
-  // mat4 invMVP = transpose(inverse(u_transform));
-  v_normal = normalize(mat3(u_transform) * a_normal);
-  v_color = a_color;
+  v_tangent = mat3(u_transform) * normalize(a_tangent); //vec3(-v_normal.y, v_normal.x, v_normal.z);
+  v_normal = mat3(u_transform) * normalize(a_position).xyz;
+ 
+  float height = getHeight(a_position);
 
-  float noise = (snoise(a_position * 1.0) + 0.5 * snoise(a_position * 2.0) + 0.25 * snoise(a_position * 4.0)) / 1.75;
+  worldPos.xyz += normalize(worldPos.xyz) * height * u_mountainHeight;
 
-  float height = noise;
-  float heightAboveWater = max(height - u_waterLevel, 0.0);
-  float normalizedHeightAboveWater = heightAboveWater / (1.0 - u_waterLevel);
-  if (heightAboveWater > 0.0) {
-    float maxHeight = 0.05;
-    worldPos.xyz += v_normal * normalizedHeightAboveWater * maxHeight;
-  }
-
-  v_texCoord = a_texCoord;
   v_height = height;
 
   v_pos = a_position;
+
   // gl_Position - специальная переменная вершинного шейдера,
   // которая отвечает за установку положения
   v_worldPos = worldPos.xyz;
@@ -416,12 +429,11 @@ export const planetFragmentShaderSource = `
 precision mediump float;
 
 // input from vertex shader
-varying highp vec3 v_color;
-varying highp vec2 v_texCoord;
 varying vec3 v_normal;
 varying vec3 v_worldPos;
 varying float v_height;
 varying vec3 v_pos;
+varying vec3 v_tangent;
 
 // const per program
 uniform sampler2D u_sampler;
@@ -432,65 +444,28 @@ uniform vec3 u_earthColor;
 uniform vec3 u_waterColor;
 uniform float u_waterLevel;
 
+uniform mat4 u_transform;
+
 uniform vec3 u_eye;
 
-// https://www.shadertoy.com/view/Xd3GRf - формула для вычисления непрерывного simplex noise
-lowp vec4 permute(in lowp vec4 x) {
-  return mod(x*x*34.+x,289.);
+#common
+
+float getHeight_(vec3 pos) {
+  return (snoise(pos * 1.0) + 0.5 * snoise(pos * 2.0) + 0.25 * snoise(pos * 4.0)) / 1.75;
 }
-lowp float snoise(in mediump vec3 v) {
-  const lowp vec2 C = vec2(0.16666666666,0.33333333333);
-  const lowp vec4 D = vec4(0,.5,1,2);
-  lowp vec3 i  = floor(C.y*(v.x+v.y+v.z) + v);
-  lowp vec3 x0 = C.x*(i.x+i.y+i.z) + (v - i);
-  lowp vec3 g = step(x0.yzx, x0);
-  lowp vec3 l = (1. - g).zxy;
-  lowp vec3 i1 = min( g, l );
-  lowp vec3 i2 = max( g, l );
-  lowp vec3 x1 = x0 - i1 + C.x;
-  lowp vec3 x2 = x0 - i2 + C.y;
-  lowp vec3 x3 = x0 - D.yyy;
-  i = mod(i,289.);
-  lowp vec4 p = permute( permute( permute(
-  i.z + vec4(0., i1.z, i2.z, 1.))
-  + i.y + vec4(0., i1.y, i2.y, 1.))
-  + i.x + vec4(0., i1.x, i2.x, 1.));
-  lowp vec3 ns = .142857142857 * D.wyz - D.xzx;
-  lowp vec4 j = -49. * floor(p * ns.z * ns.z) + p;
-  lowp vec4 x_ = floor(j * ns.z);
-  lowp vec4 x = x_ * ns.x + ns.yyyy;
-  lowp vec4 y = floor(j - 7. * x_ ) * ns.x + ns.yyyy;
-  lowp vec4 h = 1. - abs(x) - abs(y);
-  lowp vec4 b0 = vec4( x.xy, y.xy );
-  lowp vec4 b1 = vec4( x.zw, y.zw );
-  lowp vec4 sh = -step(h, vec4(0));
-  lowp vec4 a0 = b0.xzyw + (floor(b0)*2.+ 1.).xzyw*sh.xxyy;
-  lowp vec4 a1 = b1.xzyw + (floor(b1)*2.+ 1.).xzyw*sh.zzww;
-  lowp vec3 p0 = vec3(a0.xy,h.x);
-  lowp vec3 p1 = vec3(a0.zw,h.y);
-  lowp vec3 p2 = vec3(a1.xy,h.z);
-  lowp vec3 p3 = vec3(a1.zw,h.w);
-  lowp vec4 norm = inversesqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-  p0 *= norm.x;
-  p1 *= norm.y;
-  p2 *= norm.z;
-  p3 *= norm.w;
-  lowp vec4 m = max(.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.);
-  return .5 + 12. * dot( m * m * m, vec4( dot(p0,x0), dot(p1,x1),dot(p2,x2), dot(p3,x3) ) );
+
+float getHeight(vec3 pos) {
+  float height = clamp((snoise(pos * 1.0) + 0.5 * snoise(pos * 2.0) + 0.25 * snoise(pos * 4.0)) / 1.75, u_waterLevel, 1.0);
+  float heightAboveWater = max(height - u_waterLevel, 0.0);
+  float normalizedHeightAboveWater = heightAboveWater / (1.0 - u_waterLevel);
+  return normalizedHeightAboveWater;
 }
 
 void main() {
-  //vec2 loc = v_texCoord; // center pixel cooordinate
-  //vec3 acc = texture2D(u_sampler, loc).rgb; // accumulate center pixel
+  vec3 L = normalize(u_lightDir);
 
-  vec3 L = -normalize(u_lightDir);
-
-  vec3 camPos = vec3(0.0, 0.0, 0.0);
-  vec3 V = normalize(v_worldPos - u_eye);
+  vec3 V = normalize(u_eye - v_worldPos);
   vec3 N = v_normal;
-
-  vec3 R = reflect(-L, N);
-  //float specPower = pow(max(dot(R, V), 0.0), v_height >= 0.0 ? 8.0 : 24.0);
 
   float noise = (snoise(v_pos * 1.0) + 0.5 * snoise(v_pos * 2.0) + 0.25 * snoise(v_pos * 4.0)) / 1.75;
   float noise1 = snoise(v_pos * 1.0) * snoise(v_pos * 2.0);
@@ -504,16 +479,37 @@ void main() {
 
   float waterLevel = u_waterLevel;
   float snowLayer = 0.8 * (1.0 - abs(v_pos.y));
-  float height = noise1;
+  float height = getHeight_(v_pos);
+
+  float step = 0.04;
+  vec3 tangent = v_tangent; //vec3(-v_normal.y, v_normal.x, v_normal.z);
+  vec3 bitangent = normalize(cross(v_pos, tangent));
+  float radius = length(v_pos);
+  //tangent = cross(bitangent, v_pos);
+  float tH = getHeight(normalize(v_pos - tangent * step ) * radius);
+  float bH = getHeight(normalize(v_pos + tangent * step ) * radius);
+  float lH = getHeight(normalize(v_pos - bitangent * step ) * radius);
+  float rH = getHeight(normalize(v_pos + bitangent * step ) * radius);
+  mat3 TBN = mat3(
+    tangent,
+    bitangent,
+    v_normal
+    );
+  N = TBN * normalize(vec3(2.0 * ( rH - lH ), 2.0 * ( bH - tH ), -4.0));
+
+
   float heightAboveWater = max(height - waterLevel, 0.0);
   float normalizedHeightAboveWater = heightAboveWater / (1.0 - waterLevel) * noise2;
 
-  float border = smoothstep(u_waterLevel - 0.1, u_waterLevel, v_height);
-  float specPower = mix(64.0, 8.0, border);
-  float specularStrength = mix(2.0, 0.6, border);
+  const float borderThickness = 0.05;
+  float border = smoothstep(u_waterLevel - borderThickness, u_waterLevel, height);
+  float specPower = height > u_waterLevel + borderThickness ? 32.0 : 256.0;
+  //float specPower = mix(256.0, 64.0, border);
+  float specularStrength = mix(5.0, 0.1, border);
   vec3 color = mix(waterColor, earthColor, border);
-  if (v_height > u_waterLevel) {
-    float mountainIntensity = min(max(v_height - 0.6, 0.0) / 0.3, 1.0);
+
+  if (height > u_waterLevel) {
+    float mountainIntensity = min(max(height - 0.6, 0.0) / 0.3, 1.0);
     color = mix(color, mountainColor, mountainIntensity);
   } else {
     color *= min(max(noise - 0.4, border) + 0.5, 1.0);
@@ -526,107 +522,50 @@ void main() {
   float snowIntensity = smoothstep(0.0, 0.5, max(abs(v_pos.y) - 0.2, 0.0)) * snowNoise;
   color = mix(color, snowColor, snowIntensity);
 
-
-  float NoL = max(dot(v_normal, -L), 0.0);
+  vec3 R = normalize(reflect(L, N));
+  float NoL = max(dot(N, -L), 0.0);
 
   vec3 lightColor = vec3(1.0, 1.0, 0.5) * 0.7;
   vec3 diffuse = NoL * color;
   vec3 specular = specularStrength * pow(max(dot(R, V), 0.0), specPower) * lightColor;
-  vec3 ambient = color * 0.3;
+  vec3 ambient = color * vec3(4.0 / 255.0, 5.0 / 255.0, 45.0 / 255.0) * 1.5;
   vec3 resultLighting = diffuse + specular + ambient;
   gl_FragColor = vec4(resultLighting, 1.0);
-  //gl_FragColor = vec4(v_texCoord, 0.0, 1.0);
-  //gl_FragColor = vec4(v_planetColor, 1.0);
 }`;
 
 export const cloudsVertexShaderSource = `
+precision mediump float;
 // атрибут, который будет получать данные из буфера
 // input from javascript
 attribute vec3 a_position;
-attribute vec3 a_color;
-attribute vec2 a_texCoord;
-attribute vec3 a_normal;
+attribute vec3 a_tangent;
+
 
 // output to fragment shader
-varying highp vec3 v_color;
-varying highp vec2 v_texCoord;
 varying vec3 v_normal;
 varying vec3 v_worldPos;
 varying vec3 v_pos;
+varying vec3 v_tangent;
 
 // const
 uniform mat4 u_transform;
 uniform mat4 u_projection;
 uniform mediump float u_time;
 
-// https://www.shadertoy.com/view/Xd3GRf - формула для вычисления непрерывного simplex noise
-lowp vec4 permute(in lowp vec4 x) {
-  return mod(x*x*34.+x,289.);
-}
-lowp float snoise(in mediump vec3 v) {
-  const lowp vec2 C = vec2(0.16666666666,0.33333333333);
-  const lowp vec4 D = vec4(0,.5,1,2);
-  lowp vec3 i  = floor(C.y*(v.x+v.y+v.z) + v);
-  lowp vec3 x0 = C.x*(i.x+i.y+i.z) + (v - i);
-  lowp vec3 g = step(x0.yzx, x0);
-  lowp vec3 l = (1. - g).zxy;
-  lowp vec3 i1 = min( g, l );
-  lowp vec3 i2 = max( g, l );
-  lowp vec3 x1 = x0 - i1 + C.x;
-  lowp vec3 x2 = x0 - i2 + C.y;
-  lowp vec3 x3 = x0 - D.yyy;
-  i = mod(i,289.);
-  lowp vec4 p = permute( permute( permute(
-  i.z + vec4(0., i1.z, i2.z, 1.))
-  + i.y + vec4(0., i1.y, i2.y, 1.))
-  + i.x + vec4(0., i1.x, i2.x, 1.));
-  lowp vec3 ns = .142857142857 * D.wyz - D.xzx;
-  lowp vec4 j = -49. * floor(p * ns.z * ns.z) + p;
-  lowp vec4 x_ = floor(j * ns.z);
-  lowp vec4 x = x_ * ns.x + ns.yyyy;
-  lowp vec4 y = floor(j - 7. * x_ ) * ns.x + ns.yyyy;
-  lowp vec4 h = 1. - abs(x) - abs(y);
-  lowp vec4 b0 = vec4( x.xy, y.xy );
-  lowp vec4 b1 = vec4( x.zw, y.zw );
-  lowp vec4 sh = -step(h, vec4(0));
-  lowp vec4 a0 = b0.xzyw + (floor(b0)*2.+ 1.).xzyw*sh.xxyy;
-  lowp vec4 a1 = b1.xzyw + (floor(b1)*2.+ 1.).xzyw*sh.zzww;
-  lowp vec3 p0 = vec3(a0.xy,h.x);
-  lowp vec3 p1 = vec3(a0.zw,h.y);
-  lowp vec3 p2 = vec3(a1.xy,h.z);
-  lowp vec3 p3 = vec3(a1.zw,h.w);
-  lowp vec4 norm = inversesqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-  p0 *= norm.x;
-  p1 *= norm.y;
-  p2 *= norm.z;
-  p3 *= norm.w;
-  lowp vec4 m = max(.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.);
-  return .5 + 12. * dot( m * m * m, vec4( dot(p0,x0), dot(p1,x1),dot(p2,x2), dot(p3,x3) ) );
-}
-
-const float PI = 3.1415926535897932384626433832795;
-float cloudsIntensity(vec3 pos) {
-  float noise = (snoise(pos * 1.0 ) + 0.5 * snoise(pos * 2.0) + 0.25 * snoise(pos * 4.0) + 0.25 * snoise(pos * 8.0))  * sin(u_time * PI) / 2.0;
-  noise = clamp(noise + 0.1, 0.0, 1.0);
-
-  if (noise <= 0.7) {
-    noise = noise * smoothstep(0.5, 0.7, noise);
-  }
-  return noise;
-}
+#common
 
 void main() {
   vec4 worldPos = (u_transform * vec4(a_position, 1.0));
-  // mat4 invMVP = transpose(inverse(u_transform));
-  v_normal = normalize(mat3(u_transform) * a_normal);
-  v_color = a_color;
+  v_normal = normalize(worldPos.xyz); // normalize(mat3(u_transform) * a_normal);
 
-  v_texCoord = a_texCoord;
   v_pos = a_position;
   // gl_Position - специальная переменная вершинного шейдера,
   // которая отвечает за установку положения
 
-  float height = cloudsIntensity(v_pos);
+  float height = cloudsIntensity(v_pos, u_time);
+
+  v_tangent = a_tangent;
+
   worldPos.xyz += v_normal * height * 0.015;
   v_worldPos = worldPos.xyz;
   vec4 transformedPosition = u_projection * worldPos;
@@ -636,85 +575,48 @@ void main() {
 export const cloudsFragmentShaderSource = `
 precision mediump float;
 // input from vertex shader
-varying highp vec3 v_color;
-varying highp vec2 v_texCoord;
 varying vec3 v_normal;
 varying vec3 v_worldPos;
 varying vec3 v_pos;
+varying vec3 v_tangent;
 
 // const per program
 uniform sampler2D u_sampler;
 uniform vec3 u_lightDir;
 uniform float u_time;
+uniform mat4 u_transform;
 
 uniform vec3 u_eye;
 
-// https://www.shadertoy.com/view/Xd3GRf - формула для вычисления непрерывного simplex noise
-lowp vec4 permute(in lowp vec4 x) {
-  return mod(x*x*34.+x,289.);
-}
-lowp float snoise(in mediump vec3 v) {
-  const lowp vec2 C = vec2(0.16666666666,0.33333333333);
-  const lowp vec4 D = vec4(0,.5,1,2);
-  lowp vec3 i  = floor(C.y*(v.x+v.y+v.z) + v);
-  lowp vec3 x0 = C.x*(i.x+i.y+i.z) + (v - i);
-  lowp vec3 g = step(x0.yzx, x0);
-  lowp vec3 l = (1. - g).zxy;
-  lowp vec3 i1 = min( g, l );
-  lowp vec3 i2 = max( g, l );
-  lowp vec3 x1 = x0 - i1 + C.x;
-  lowp vec3 x2 = x0 - i2 + C.y;
-  lowp vec3 x3 = x0 - D.yyy;
-  i = mod(i,289.);
-  lowp vec4 p = permute( permute( permute(
-  i.z + vec4(0., i1.z, i2.z, 1.))
-  + i.y + vec4(0., i1.y, i2.y, 1.))
-  + i.x + vec4(0., i1.x, i2.x, 1.));
-  lowp vec3 ns = .142857142857 * D.wyz - D.xzx;
-  lowp vec4 j = -49. * floor(p * ns.z * ns.z) + p;
-  lowp vec4 x_ = floor(j * ns.z);
-  lowp vec4 x = x_ * ns.x + ns.yyyy;
-  lowp vec4 y = floor(j - 7. * x_ ) * ns.x + ns.yyyy;
-  lowp vec4 h = 1. - abs(x) - abs(y);
-  lowp vec4 b0 = vec4( x.xy, y.xy );
-  lowp vec4 b1 = vec4( x.zw, y.zw );
-  lowp vec4 sh = -step(h, vec4(0));
-  lowp vec4 a0 = b0.xzyw + (floor(b0)*2.+ 1.).xzyw*sh.xxyy;
-  lowp vec4 a1 = b1.xzyw + (floor(b1)*2.+ 1.).xzyw*sh.zzww;
-  lowp vec3 p0 = vec3(a0.xy,h.x);
-  lowp vec3 p1 = vec3(a0.zw,h.y);
-  lowp vec3 p2 = vec3(a1.xy,h.z);
-  lowp vec3 p3 = vec3(a1.zw,h.w);
-  lowp vec4 norm = inversesqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-  p0 *= norm.x;
-  p1 *= norm.y;
-  p2 *= norm.z;
-  p3 *= norm.w;
-  lowp vec4 m = max(.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.);
-  return .5 + 12. * dot( m * m * m, vec4( dot(p0,x0), dot(p1,x1),dot(p2,x2), dot(p3,x3) ) );
-}
-
-const float PI = 3.1415926535897932384626433832795;
-float cloudsIntensity(vec3 pos) {
-  float noise = (snoise(pos * 1.0) + 0.5 * snoise(pos * 2.0) + 0.25 * snoise(pos * 4.0) + 0.25 * snoise(pos * 8.0)) * sin(u_time * PI)/ 2.0;
-  noise = clamp(noise + 0.1, 0.0, 1.0);
-
-  if (noise <= 0.7) {
-    noise = noise * smoothstep(0.5, 0.7, noise);
-  }
-  return noise;
-}
+#common
 
 void main() {
-  vec3 L = -normalize(u_lightDir);
+  vec3 L = normalize(u_lightDir);
 
-  vec3 V = normalize(v_worldPos - u_eye);
+  vec3 V = normalize(u_eye - v_worldPos);
   vec3 N = v_normal;
 
-  vec3 R = reflect(-L, N);
+  vec3 R = reflect(L, N);
   //float specPower = pow(max(dot(R, V), 0.0), v_height >= 0.0 ? 8.0 : 24.0);
 
-  float noise = cloudsIntensity(v_pos);
+  float noise = cloudsIntensity(v_pos, u_time);
+
+  float step = 0.04;
+  vec3 tangent = v_tangent; //vec3(-v_normal.y, v_normal.x, v_normal.z);
+  vec3 bitangent = normalize(cross(v_pos, tangent));
+  float radius = length(v_pos);
+  //tangent = cross(bitangent, v_pos);
+  float tH = cloudsIntensity(normalize(v_pos - tangent * step ) * radius, u_time);
+  float bH = cloudsIntensity(normalize(v_pos + tangent * step ) * radius, u_time);
+  float lH = cloudsIntensity(normalize(v_pos - bitangent * step ) * radius, u_time);
+  float rH = cloudsIntensity(normalize(v_pos + bitangent * step ) * radius, u_time);
+  //N = normalize(mat3(u_transform) * normalize(vec3(2.0 * ( rH - lH ), 2.0 * ( bH - tH ), 4.0)));
+  mat3 TBN = mat3(
+    tangent,
+    bitangent,
+    v_normal
+    );
+  N = TBN * normalize(vec3(2.0 * ( rH - lH ), 2.0 * ( bH - tH ), -4.0));
 
   float NoV = abs(dot(v_normal, V));
   if (NoV < 0.3) {
@@ -724,7 +626,7 @@ void main() {
   float specPower = 2.0;
   float specularStrength = 0.6;
 
-  float NoL = max(dot(v_normal, -L), 0.0); // max(dot(v_normal, -L), 0.0);
+  float NoL = max(dot(N, -L), 0.0); // max(dot(v_normal, -L), 0.0);
   vec3 lightColor = vec3(1.0, 1.0, 0.5) * 0.7;
   vec3 color = vec3(1.0, 1.0, 1.0) * noise;
   vec3 diffuse = NoL * color;
@@ -732,6 +634,4 @@ void main() {
   vec3 ambient = color * 0.3;
   vec3 resultLighting = diffuse + specular + ambient;
   gl_FragColor = vec4(resultLighting, noise);
-  //gl_FragColor = vec4(v_texCoord, 0.0, 1.0);
-  //gl_FragColor = vec4(v_planetColor, 1.0);
 }`;

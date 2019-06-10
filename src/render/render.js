@@ -1,5 +1,5 @@
 import Texture from './texture'
-import { defaultFragmentShaderSource, vertexShaderSource, fxaaFragmentShaderSource } from './shaders';
+import { defaultFragmentShaderSource, vertexShaderSource, fxaaFragmentShaderSource, common } from './shaders';
 import Vec3 from './vec3'
 import * as math from 'mathjs';
 
@@ -34,6 +34,9 @@ export default class Render {
 
   createShader(gl, type, source) {
     const shader = gl.createShader(type);   // создание шейдера
+
+    source = source.replace('#common', common);
+
     gl.shaderSource(shader, source);        // устанавливаем шейдеру его программный код
     gl.compileShader(shader);               // компилируем шейдер
     const success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
@@ -479,7 +482,7 @@ export default class Render {
   }
 
   getGrid(width, height, steps, meshStartIdx, transform) {
-    const elementPerVertex = 11;
+    const elementPerVertex = 6;
     const numElements = steps * steps * 4 * elementPerVertex;
     const vertices = new Array(numElements);
     const idxs = [];
@@ -518,24 +521,18 @@ export default class Render {
           vertices[vertexElementIdx++] = positionOnSphere.y;
           vertices[vertexElementIdx++] = positionOnSphere.z;
 
-          vertices[vertexElementIdx++] = color[0];
-          vertices[vertexElementIdx++] = color[1];
-          vertices[vertexElementIdx++] = color[2];
+          const tangent = math.multiply(math.matrix([0.0, 1.0, 0.0, 0.0]), transform).toArray();
 
-          vertices[vertexElementIdx++] = texCoord[0];
-          vertices[vertexElementIdx++] = texCoord[1];
+          vertices[vertexElementIdx++] = tangent[0];
+          vertices[vertexElementIdx++] = tangent[1];
+          vertices[vertexElementIdx++] = tangent[2];
 
-          vertices[vertexElementIdx++] = normal.x;
-          vertices[vertexElementIdx++] = normal.y;
-          vertices[vertexElementIdx++] = normal.z;
+          // vertices[vertexElementIdx++] = texCoord[0];
+          // vertices[vertexElementIdx++] = texCoord[1];
 
-          //vertices.push.apply( // vertex position
-          //  vertices,
-          //  [positionOnSphere.x, positionOnSphere.y, positionOnSphere.z]
-          //);
-          //vertices.push.apply(vertices, color); // vertex color
-          //vertices.push.apply(vertices, texCoord);
-          //vertices.push.apply(vertices, [normal.x, normal.y, normal.z]); // vertex normal
+          // vertices[vertexElementIdx++] = normal.x;
+          // vertices[vertexElementIdx++] = normal.y;
+          // vertices[vertexElementIdx++] = normal.z;
           numVertices++;
         }
 
@@ -567,8 +564,8 @@ export default class Render {
         [90, 0],
         [180, 0],
         [270, 0],
-        [0, 90],
-        [0, -90]
+        [0,  90],
+        [0,  -90]
       ];
 
       const width = 2;
@@ -645,10 +642,6 @@ export default class Render {
 
     const { vertices: positionBuffer, indices: idxBuffer, indicesCount: count } = this.getPlanetPositionBuffer();
 
-    const positionAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_position');
-    console.assert(positionAttributeLocation !== -1);
-
-    gl.enableVertexAttribArray(positionAttributeLocation);
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuffer);
 
@@ -657,37 +650,22 @@ export default class Render {
     let size = 3;           // 3 компоненты на итерацию (x, y, z)
     const type = gl.FLOAT;    // наши данные - 32-битные числа с плавающей точкой
     const normalize = false;  // не нормализовать данные (не приводить в диапазон от 0 до 1)
-    const stride = 11 * 4;     // на каждую вершину храним 9 компонент, размер gl.FLOAT - 4 байта [position.xyz, color.xyz, texCoord.xy, normal.xyz]
+    const stride = 6 * 4;     // на каждую вершину храним 9 компонент, размер gl.FLOAT - 4 байта [position.xyz, color.xyz, texCoord.xy, normal.xyz]
     let offset = 0;           // начинать с начала буфера
 
+    const positionAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_position');
+    console.assert(positionAttributeLocation !== -1);
+
+    gl.enableVertexAttribArray(positionAttributeLocation);
     // Для атрибута позиции необходимо использовать следуюшие данные
     gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
 
-    // Для атрибута текстурных координат необходимо использовать следуюшие данные
-    const colorAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_color');
-    console.assert(colorAttributeLocation !== -1);
-    gl.enableVertexAttribArray(colorAttributeLocation);
-    // Для атрибута текстурных координат colorAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
-    // пропускаем первые 3 элемента, размер gl.FLOAT - 4 байта
+    const tangentAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_tangent');
+    console.assert(tangentAttributeLocation !== -1);
     offset = 3 * 4;
-    size = 3;
-    gl.vertexAttribPointer(colorAttributeLocation, size, type, normalize, stride, offset);
-
-    // Для атрибута текстурных координат необходимо использовать следуюшие данные
-    const texCoordAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_texCoord');
-    console.assert(texCoordAttributeLocation !== -1);
-    gl.enableVertexAttribArray(texCoordAttributeLocation);
-    // Для атрибута текстурных координат texCoordAttributeLocation, как получать данные от positionBuffer (ARRAY_BUFFER)
-    // пропускаем первые 6 элементов, размер gl.FLOAT - 4 байта
-    offset = 6 * 4;
-    size = 2;
-    gl.vertexAttribPointer(texCoordAttributeLocation, size, type, normalize, stride, offset);
-
-    const normalAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_normal');
-    console.assert(normalAttributeLocation !== -1);
-    offset = 8 * 4; // position (3) + color(3) + texCoord(2) == 8
-    size = 3; // normal.xyz
-    gl.vertexAttribPointer(normalAttributeLocation, size, type, normalize, stride, offset);
+    gl.enableVertexAttribArray(tangentAttributeLocation);
+    // Для атрибута позиции необходимо использовать следуюшие данные
+    gl.vertexAttribPointer(tangentAttributeLocation, size, type, normalize, stride, offset);
 
     // count - количество вершин для отправки на отрисовку
     gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, 0);

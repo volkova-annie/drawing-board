@@ -36,6 +36,7 @@ class Planet extends Component {
     this.handleColorMountains = this.handleColorMountains.bind(this);
     this.handleColorSnow = this.handleColorSnow.bind(this);
     this.handleWaterLevel = this.handleWaterLevel.bind(this);
+    this.handleMountainsHeight = this.handleMountainsHeight.bind(this);
 
     this.planet = React.createRef();
 
@@ -55,12 +56,13 @@ class Planet extends Component {
       cameraX: 0,
       cameraY: 0,
       cameraZ: 2.5,
-      lightX: 0.6,
-      lightY: 0.55,
-      lightZ: 0.35,
+      lightX:  0.55,
+      lightY:  1.00,
+      lightZ: -0.65,
       touchStartPosition: null,
       mousePressed: false,
       waterLevel: 0.55,
+      mountainHeight: 0.1,
       waterColor: {
         r: '21.0',
         g: '135.0',
@@ -129,7 +131,7 @@ class Planet extends Component {
   renderGL() {
     const { gl, render, planetShaderProgram, cloudsShaderProgram, camera,
       cameraX, cameraY, cameraZ, lightX, lightY, lightZ,
-      snowColor, waterColor, earthColor, mountainsColor, waterLevel, bgPlanetColor
+      snowColor, waterColor, earthColor, mountainsColor, waterLevel, mountainHeight, bgPlanetColor
     } = this.state;
 
     render.bgPlanetColor = bgPlanetColor;
@@ -146,7 +148,7 @@ class Planet extends Component {
 
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_projection'), false, this.getPerspectiveMatrix());
 
-    const planetAngleY = (time / 10000 * -10 % 360);
+    const planetAngleY = 0;//(time / 10000 * -10 % 360);
     const modelPlanetTransform = this.getTransform({ rotateY: planetAngleY });
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelPlanetTransform);
     gl.uniform3f(gl.getUniformLocation(planetShaderProgram, 'u_lightDir'), lightX, lightY, lightZ);
@@ -155,6 +157,7 @@ class Planet extends Component {
     gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_earthColor'), this.convertColor(earthColor));
     gl.uniform3fv(gl.getUniformLocation(planetShaderProgram, 'u_waterColor'), this.convertColor(waterColor));
     gl.uniform1f(gl.getUniformLocation(planetShaderProgram, 'u_waterLevel'), waterLevel);
+    gl.uniform1f(gl.getUniformLocation(planetShaderProgram, 'u_mountainHeight'), mountainHeight);
 
     gl.uniform3f(gl.getUniformLocation(planetShaderProgram, 'u_eye'), camera.position.x, camera.position.y, camera.position.z);
 
@@ -366,7 +369,7 @@ class Planet extends Component {
       this.setState((state) => {
         return {
           cameraX: Math.min(Math.max(state.cameraX - movementX * 0.05, min), max).toFixed(2),
-          cameraY: Math.min(Math.max(Number(state.cameraY) + movementY * 0.05, min), max).toFixed(2)
+          cameraY: Math.min(Math.max(Number(state.cameraY) - movementY * 0.05, min), max).toFixed(2)
         }
       });
     }
@@ -397,11 +400,16 @@ class Planet extends Component {
     this.setState({ waterLevel });
   }
 
+  handleMountainsHeight(event) {
+    const mountainHeight = event.target.value;
+    this.setState({ mountainHeight });
+  }
+
   render() {
     const {
       canvasWidth, canvasHeight, cameraX, cameraY, cameraZ,
       lightX, lightY, lightZ, bgPlanetColor,
-      waterColor, earthColor, mountainsColor, snowColor, waterLevel
+      waterColor, earthColor, mountainsColor, snowColor, mountainHeight, waterLevel
     } = this.state;
 
     const bgColor = { background: `rgba(${ bgPlanetColor[0] * 255}, ${ bgPlanetColor[1] * 255}, ${ bgPlanetColor[2] * 255 }, ${ bgPlanetColor[3] })`};
@@ -416,8 +424,8 @@ class Planet extends Component {
               <input
                 id='cameraX'
                 type='range'
-                min='-1'
-                max='1'
+                min='-3'
+                max='3'
                 step='0.1'
                 value={ cameraX }
                 onChange={ this.handleCameraX }
@@ -430,8 +438,8 @@ class Planet extends Component {
               <input
                 id='cameraY'
                 type='range'
-                min='-1'
-                max='1'
+                min='-3'
+                max='3'
                 step='0.1'
                 value={ cameraY }
                 onChange={ this.handleCameraY }
@@ -540,6 +548,19 @@ class Planet extends Component {
                   onChange={ this.handleWaterLevel }
               />
             </label>
+            <h3>Mountains Height</h3>
+            <label htmlFor='mountainHeight'>
+              { Number(mountainHeight).toFixed(2) }
+              <input
+                id='mountainHeight'
+                type='range'
+                min='0'
+                max='1'
+                step='0.01'
+                value={ mountainHeight }
+                onChange={ this.handleMountainsHeight }
+            />
+          </label>
           </div>
         </div>
         <div>

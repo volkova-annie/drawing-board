@@ -5,14 +5,13 @@ export default class Camera {
   constructor(position, lookAt, up) {
     this.position = position;
     this.lookAt = lookAt;
-    console.log('lookAt', this.lookAt);
     this.up = up;
   }
 
   get transform() {
-    const dirFromLookAt = Vec3.create().asSub(this.lookAt, this.position).normalize();
+    // const dirFromLookAt = Vec3.create().asSub(this.lookAt, this.position).normalize();
 
-    const zAxis = Vec3.create().asSub(this.position, this.lookAt).normalize(); 
+    const zAxis = Vec3.create().asSub(this.lookAt, this.position).normalize();
     const xAxis = Vec3.create().asCross(this.up, zAxis).normalize();
     const yAxis = Vec3.create().asCross(zAxis, xAxis).normalize();
 
