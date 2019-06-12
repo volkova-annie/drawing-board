@@ -482,7 +482,7 @@ export default class Render {
   }
 
   getGrid(width, height, steps, meshStartIdx, transform) {
-    const elementPerVertex = 6;
+    const elementPerVertex = 3;
     const numElements = steps * steps * 4 * elementPerVertex;
     const vertices = new Array(numElements);
     const idxs = [];
@@ -521,18 +521,6 @@ export default class Render {
           vertices[vertexElementIdx++] = positionOnSphere.y;
           vertices[vertexElementIdx++] = positionOnSphere.z;
 
-          const tangent = math.multiply(math.matrix([0.0, 1.0, 0.0, 0.0]), transform).toArray();
-
-          vertices[vertexElementIdx++] = tangent[0];
-          vertices[vertexElementIdx++] = tangent[1];
-          vertices[vertexElementIdx++] = tangent[2];
-
-          // vertices[vertexElementIdx++] = texCoord[0];
-          // vertices[vertexElementIdx++] = texCoord[1];
-
-          // vertices[vertexElementIdx++] = normal.x;
-          // vertices[vertexElementIdx++] = normal.y;
-          // vertices[vertexElementIdx++] = normal.z;
           numVertices++;
         }
 
@@ -650,7 +638,7 @@ export default class Render {
     let size = 3;           // 3 компоненты на итерацию (x, y, z)
     const type = gl.FLOAT;    // наши данные - 32-битные числа с плавающей точкой
     const normalize = false;  // не нормализовать данные (не приводить в диапазон от 0 до 1)
-    const stride = 6 * 4;     // на каждую вершину храним 9 компонент, размер gl.FLOAT - 4 байта [position.xyz, color.xyz, texCoord.xy, normal.xyz]
+    const stride = 3 * 4;     // на каждую вершину храним 3 компонент, размер gl.FLOAT - 4 байта [position.xyz]
     let offset = 0;           // начинать с начала буфера
 
     const positionAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_position');
@@ -659,13 +647,6 @@ export default class Render {
     gl.enableVertexAttribArray(positionAttributeLocation);
     // Для атрибута позиции необходимо использовать следуюшие данные
     gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
-
-    const tangentAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_tangent');
-    console.assert(tangentAttributeLocation !== -1);
-    offset = 3 * 4;
-    gl.enableVertexAttribArray(tangentAttributeLocation);
-    // Для атрибута позиции необходимо использовать следуюшие данные
-    gl.vertexAttribPointer(tangentAttributeLocation, size, type, normalize, stride, offset);
 
     // count - количество вершин для отправки на отрисовку
     gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, 0);

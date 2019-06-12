@@ -17,7 +17,7 @@ class App extends Component {
   render() {
     const { showingPage } = this.state;
     return (
-      <div className='App'>
+      <div className={ styles.app }>
         <header>
           <form className={ styles['tabs'] }>
             <input

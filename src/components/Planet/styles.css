@@ -43,6 +43,18 @@
   width: 90px;
 }
 
+input[type='checkbox'] {
+  margin-right: 20px;
+}
+
+label[for*='fxaaEnabled'] {
+  margin-top: 20px;
+}
+
+input[type='checkbox'] + label {
+  margin-top: 20px;
+}
+
 input[type='range'] {
   background-color: transparent;
   -webkit-appearance: none;

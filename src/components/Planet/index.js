@@ -37,6 +37,7 @@ class Planet extends Component {
     this.handleColorSnow = this.handleColorSnow.bind(this);
     this.handleWaterLevel = this.handleWaterLevel.bind(this);
     this.handleMountainsHeight = this.handleMountainsHeight.bind(this);
+    this.handleFxaaEnable = this.handleFxaaEnable.bind(this);
 
     this.planet = React.createRef();
 
@@ -63,6 +64,7 @@ class Planet extends Component {
       mousePressed: false,
       waterLevel: 0.55,
       mountainHeight: 0.1,
+      fxaaEnabled: true,
       waterColor: {
         r: '21.0',
         g: '135.0',
@@ -131,7 +133,7 @@ class Planet extends Component {
   renderGL() {
     const { gl, render, planetShaderProgram, cloudsShaderProgram, camera,
       cameraX, cameraY, cameraZ, lightX, lightY, lightZ,
-      snowColor, waterColor, earthColor, mountainsColor, waterLevel, mountainHeight, bgPlanetColor
+      snowColor, waterColor, earthColor, mountainsColor, waterLevel, mountainHeight, bgPlanetColor, fxaaEnabled
     } = this.state;
 
     render.bgPlanetColor = bgPlanetColor;
@@ -139,7 +141,8 @@ class Planet extends Component {
     render.beginFrame();
 
     const FRACTION = 100000;
-    const time = new Date().getTime(); // 1556361728843;
+    const time = new Date().getTime();
+    //const time = 1556361712843;
     const currentTime = (time * 5 % FRACTION) / FRACTION;
 
     gl.useProgram(planetShaderProgram);
@@ -148,7 +151,7 @@ class Planet extends Component {
 
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_projection'), false, this.getPerspectiveMatrix());
 
-    const planetAngleY = 0;//(time / 10000 * -10 % 360);
+    const planetAngleY = (time / 10000 * -10 % 360);
     const modelPlanetTransform = this.getTransform({ rotateY: planetAngleY });
     gl.uniformMatrix4fv(gl.getUniformLocation(planetShaderProgram, 'u_transform'), false, modelPlanetTransform);
     gl.uniform3f(gl.getUniformLocation(planetShaderProgram, 'u_lightDir'), lightX, lightY, lightZ);
@@ -165,7 +168,7 @@ class Planet extends Component {
 
     gl.useProgram(cloudsShaderProgram);
 
-    const cloudsScale = 1.03;
+    const cloudsScale = 1.04;
     const cloudsAngleY = (time / 10000 * 10 % 360);
     const cloudsTransform = this.getTransform({rotateY: cloudsAngleY, scale: cloudsScale});
     gl.uniformMatrix4fv(gl.getUniformLocation(cloudsShaderProgram, 'u_projection'), false, this.getPerspectiveMatrix());
@@ -180,7 +183,9 @@ class Planet extends Component {
     render.drawPlanet(cloudsShaderProgram);
     gl.disable(gl.BLEND);
 
-    render.fxaa();
+    if (fxaaEnabled) {
+      render.fxaa();
+    }
 
     const transform = this.getTransform3x3();
     render.endFrame(transform); // todo: move to Render
@@ -363,8 +368,8 @@ class Planet extends Component {
 
   handleMouseMove(event) {
     const { movementX, movementY } = event;
-    const min = -1;
-    const max = 1;
+    const min = -3;
+    const max = 3;
     if ( this.state.mousePressed ){
       this.setState((state) => {
         return {
@@ -403,6 +408,11 @@ class Planet extends Component {
   handleMountainsHeight(event) {
     const mountainHeight = event.target.value;
     this.setState({ mountainHeight });
+  }
+
+  handleFxaaEnable(event) {
+    const fxaaEnabled = event.target.checked;
+    this.setState({ fxaaEnabled });
   }
 
   render() {
@@ -561,6 +571,15 @@ class Planet extends Component {
                 onChange={ this.handleMountainsHeight }
             />
           </label>
+          <label htmlFor='fxaaEnabled'>
+            <input
+              id='fxaaEnabled'
+              type='checkbox'
+              checked={ this.state.fxaaEnabled }
+              onChange={ this.handleFxaaEnable }
+            />
+            FXAA
+          </label>
           </div>
         </div>
         <div>
@@ -574,7 +593,7 @@ class Planet extends Component {
             style={{ position: 'absolute', left: 'calc(50% - 512px)' }}
           />
         </div>
-        <div className={styles.background} style={ bgColor } />
+        <div className={ styles.background } style={ bgColor } />
       </section>
     )
   }

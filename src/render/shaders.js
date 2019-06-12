@@ -379,7 +379,6 @@ precision mediump float;
 // атрибут, который будет получать данные из буфера
 // input from javascript
 attribute vec3 a_position;
-attribute vec3 a_tangent;
 
 // output to fragment shader
 varying vec3 v_normal;
@@ -387,7 +386,6 @@ varying vec3 v_worldPos;
 varying vec3 v_planetColor;
 varying float v_height;
 varying vec3 v_pos;
-varying vec3 v_tangent;
 
 // const
 uniform mat4 u_transform;
@@ -407,7 +405,6 @@ float getHeight(vec3 pos) {
 void main() {
   vec4 worldPos = (u_transform * vec4(a_position, 1.0));
 
-  v_tangent = mat3(u_transform) * normalize(a_tangent); //vec3(-v_normal.y, v_normal.x, v_normal.z);
   v_normal = mat3(u_transform) * normalize(a_position).xyz;
  
   float height = getHeight(a_position);
@@ -433,7 +430,6 @@ varying vec3 v_normal;
 varying vec3 v_worldPos;
 varying float v_height;
 varying vec3 v_pos;
-varying vec3 v_tangent;
 
 // const per program
 uniform sampler2D u_sampler;
@@ -481,11 +477,12 @@ void main() {
   float snowLayer = 0.8 * (1.0 - abs(v_pos.y));
   float height = getHeight_(v_pos);
 
-  float step = 0.04;
-  vec3 tangent = v_tangent; //vec3(-v_normal.y, v_normal.x, v_normal.z);
+  vec3 tangent = normalize(vec3(-v_pos.z, v_pos.y, v_pos.x));
+  tangent = normalize(tangent);
   vec3 bitangent = normalize(cross(v_pos, tangent));
   float radius = length(v_pos);
-  //tangent = cross(bitangent, v_pos);
+
+  float step = 0.01;
   float tH = getHeight(normalize(v_pos - tangent * step ) * radius);
   float bH = getHeight(normalize(v_pos + tangent * step ) * radius);
   float lH = getHeight(normalize(v_pos - bitangent * step ) * radius);
@@ -503,9 +500,8 @@ void main() {
 
   const float borderThickness = 0.05;
   float border = smoothstep(u_waterLevel - borderThickness, u_waterLevel, height);
-  float specPower = height > u_waterLevel + borderThickness ? 32.0 : 256.0;
-  //float specPower = mix(256.0, 64.0, border);
-  float specularStrength = mix(5.0, 0.1, border);
+  float specPower = mix(256.0, 32.0, border);
+  float specularStrength = mix(1.5, 0.2, border);
   vec3 color = mix(waterColor, earthColor, border);
 
   if (height > u_waterLevel) {
@@ -538,14 +534,11 @@ precision mediump float;
 // атрибут, который будет получать данные из буфера
 // input from javascript
 attribute vec3 a_position;
-attribute vec3 a_tangent;
-
 
 // output to fragment shader
 varying vec3 v_normal;
 varying vec3 v_worldPos;
 varying vec3 v_pos;
-varying vec3 v_tangent;
 
 // const
 uniform mat4 u_transform;
@@ -564,9 +557,7 @@ void main() {
 
   float height = cloudsIntensity(v_pos, u_time);
 
-  v_tangent = a_tangent;
-
-  worldPos.xyz += v_normal * height * 0.015;
+  worldPos.xyz += v_normal * height * 0.03;
   v_worldPos = worldPos.xyz;
   vec4 transformedPosition = u_projection * worldPos;
   gl_Position = transformedPosition; // vec4(transformedPosition, 1.0);
@@ -578,7 +569,6 @@ precision mediump float;
 varying vec3 v_normal;
 varying vec3 v_worldPos;
 varying vec3 v_pos;
-varying vec3 v_tangent;
 
 // const per program
 uniform sampler2D u_sampler;
@@ -601,15 +591,17 @@ void main() {
 
   float noise = cloudsIntensity(v_pos, u_time);
 
-  float step = 0.04;
-  vec3 tangent = v_tangent; //vec3(-v_normal.y, v_normal.x, v_normal.z);
+  float step = 0.01;
+  vec3 tangent = normalize(vec3(-v_pos.z, v_pos.y, v_pos.x));
+  tangent = normalize(tangent);
   vec3 bitangent = normalize(cross(v_pos, tangent));
   float radius = length(v_pos);
   //tangent = cross(bitangent, v_pos);
-  float tH = cloudsIntensity(normalize(v_pos - tangent * step ) * radius, u_time);
-  float bH = cloudsIntensity(normalize(v_pos + tangent * step ) * radius, u_time);
-  float lH = cloudsIntensity(normalize(v_pos - bitangent * step ) * radius, u_time);
-  float rH = cloudsIntensity(normalize(v_pos + bitangent * step ) * radius, u_time);
+  float contrast = 3.0;
+  float tH = cloudsIntensity(normalize(v_pos - tangent * step ) * radius, u_time) * contrast;
+  float bH = cloudsIntensity(normalize(v_pos + tangent * step ) * radius, u_time) * contrast;
+  float lH = cloudsIntensity(normalize(v_pos - bitangent * step ) * radius, u_time) * contrast;
+  float rH = cloudsIntensity(normalize(v_pos + bitangent * step ) * radius, u_time) * contrast;
   //N = normalize(mat3(u_transform) * normalize(vec3(2.0 * ( rH - lH ), 2.0 * ( bH - tH ), 4.0)));
   mat3 TBN = mat3(
     tangent,
@@ -631,7 +623,7 @@ void main() {
   vec3 color = vec3(1.0, 1.0, 1.0) * noise;
   vec3 diffuse = NoL * color;
   vec3 specular = specularStrength * pow(max(dot(R, V), 0.0), specPower) * lightColor;
-  vec3 ambient = color * 0.3;
+  vec3 ambient = color * 0.15;
   vec3 resultLighting = diffuse + specular + ambient;
   gl_FragColor = vec4(resultLighting, noise);
 }`;
