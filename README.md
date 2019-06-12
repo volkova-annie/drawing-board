@@ -12,7 +12,7 @@ The app includes 2 tabs:
     - rotate the planet
     - change the light position
     - change water covreage
-    - change mountains height
+    - change mountain's height
     - change the planet's colors
     - implement fxaa
 
