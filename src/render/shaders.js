@@ -389,6 +389,7 @@ varying vec3 v_pos;
 
 // const
 uniform mat4 u_transform;
+uniform mat3 u_normalTransform;
 uniform mat4 u_projection;
 uniform float u_waterLevel;
 uniform float u_mountainHeight;
@@ -405,7 +406,7 @@ float getHeight(vec3 pos) {
 void main() {
   vec4 worldPos = (u_transform * vec4(a_position, 1.0));
 
-  v_normal = mat3(u_transform) * normalize(a_position).xyz;
+  v_normal = u_normalTransform * normalize(a_position).xyz;
  
   float height = getHeight(a_position);
 
@@ -519,7 +520,7 @@ void main() {
   color = mix(color, snowColor, snowIntensity);
 
   vec3 R = normalize(reflect(L, N));
-  float NoL = max(dot(N, -L), 0.0);
+  float NoL = max(dot(N, L), 0.0);
 
   vec3 lightColor = vec3(1.0, 1.0, 0.5) * 0.7;
   vec3 diffuse = NoL * color;
@@ -542,6 +543,7 @@ varying vec3 v_pos;
 
 // const
 uniform mat4 u_transform;
+uniform mat3 u_normalTransform;
 uniform mat4 u_projection;
 uniform mediump float u_time;
 
@@ -549,7 +551,7 @@ uniform mediump float u_time;
 
 void main() {
   vec4 worldPos = (u_transform * vec4(a_position, 1.0));
-  v_normal = normalize(worldPos.xyz); // normalize(mat3(u_transform) * a_normal);
+  v_normal = u_normalTransform * normalize(a_position).xyz;
 
   v_pos = a_position;
   // gl_Position - специальная переменная вершинного шейдера,
@@ -582,7 +584,6 @@ uniform vec3 u_eye;
 
 void main() {
   vec3 L = normalize(u_lightDir);
-
   vec3 V = normalize(u_eye - v_worldPos);
   vec3 N = v_normal;
 
@@ -618,7 +619,7 @@ void main() {
   float specPower = 2.0;
   float specularStrength = 0.6;
 
-  float NoL = max(dot(N, -L), 0.0); // max(dot(v_normal, -L), 0.0);
+  float NoL = max(dot(N, L), 0.0); // max(dot(v_normal, -L), 0.0);
   vec3 lightColor = vec3(1.0, 1.0, 0.5) * 0.7;
   vec3 color = vec3(1.0, 1.0, 1.0) * noise;
   vec3 diffuse = NoL * color;
@@ -626,4 +627,63 @@ void main() {
   vec3 ambient = color * 0.15;
   vec3 resultLighting = diffuse + specular + ambient;
   gl_FragColor = vec4(resultLighting, noise);
+}`;
+
+export const moonVertexShaderSource = `
+precision mediump float;
+// атрибут, который будет получать данные из буфера
+// input from javascript
+attribute vec3 a_position;
+
+// output to fragment shader
+varying vec3 v_normal;
+varying vec3 v_worldPos;
+
+// const
+uniform mat4 u_transform;
+uniform mat3 u_normalTransform;
+uniform mat4 u_projection;
+
+#common
+
+void main() {
+  vec4 worldPos = u_transform * vec4(a_position, 1.0);
+  v_normal = u_normalTransform * normalize(a_position).xyz;
+  v_worldPos = worldPos.xyz;
+  // gl_Position - специальная переменная вершинного шейдера,
+  // которая отвечает за установку положения
+
+  gl_Position = u_projection * worldPos;
+}`;
+
+export const moonFragmentShaderSource = `
+precision mediump float;
+// input from vertex shader
+varying vec3 v_normal;
+varying vec3 v_worldPos;
+
+// const per program
+uniform vec3 u_lightDir;
+uniform vec3 u_eye;
+
+#common
+
+void main() {
+  vec3 L = normalize(u_lightDir);
+  vec3 V = normalize(u_eye - v_worldPos);
+  vec3 N = normalize(v_normal);
+  vec3 R = reflect(L, N);
+
+  float specPower = 2.0;
+  float specularStrength = 0.6;
+
+  float NoL = max(dot(N, -L), 0.0); // max(dot(v_normal, -L), 0.0);
+  vec3 lightColor = vec3(1.0, 1.0, 0.5) * 0.7;
+  vec3 color = vec3(214.0, 220.0, 170.0) / 255.0;
+  vec3 diffuse = NoL * color;
+  vec3 specular = specularStrength * pow(max(dot(R, V), 0.0), specPower) * lightColor;
+  vec3 ambient = color * vec3(2.0 / 255.0, 3.0 / 255.0, 25.0 / 255.0) * 2.0;
+  // vec3 resultLighting = diffuse + specular;
+  vec3 resultLighting = diffuse + specular + ambient;
+  gl_FragColor = vec4(resultLighting, 1.0);
 }`;
