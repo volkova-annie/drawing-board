@@ -644,8 +644,6 @@ uniform mat4 u_transform;
 uniform mat3 u_normalTransform;
 uniform mat4 u_projection;
 
-#common
-
 void main() {
   vec4 worldPos = u_transform * vec4(a_position, 1.0);
   v_normal = u_normalTransform * normalize(a_position).xyz;
@@ -665,8 +663,6 @@ varying vec3 v_worldPos;
 // const per program
 uniform vec3 u_lightDir;
 uniform vec3 u_eye;
-
-#common
 
 void main() {
   vec3 L = normalize(u_lightDir);
